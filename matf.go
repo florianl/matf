@@ -1,6 +1,7 @@
 package matf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -64,6 +65,13 @@ func readHeader(mat *Matf, file *os.File) error {
 	return nil
 }
 
+func smallDataElementField(data []byte, order binary.ByteOrder) (int, interface{}, error) {
+	//numberOfBytes := order.Uint16(data[:2])
+	dataType := order.Uint16(data[2:4])
+
+	return int(dataType), nil, nil
+}
+
 func readDataElement(m *Matf, order binary.ByteOrder) (int, interface{}, error) {
 	data := make([]byte, 8)
 	count, err := m.file.Read(data)
@@ -75,8 +83,18 @@ func readDataElement(m *Matf, order binary.ByteOrder) (int, interface{}, error) 
 		return 0, nil, fmt.Errorf("Could not read enough bytes")
 	}
 
+	small := make([]byte, 2)
+	buf := bytes.NewReader(data)
+	if err := binary.Read(buf, order, &small); err != nil {
+		return 0, nil, fmt.Errorf("Could not read bytes:", err)
+	}
+	if small[0] == 0 && small[1] == 0 {
+		// Small Data Element Format
+		return smallDataElementField(data, order)
+	}
+
 	dataType := order.Uint32(data[:4])
-	numberOfBytes := order.Uint32(data[4:8])
+	//numberOfBytes := order.Uint32(data[4:8])
 
 	return int(dataType), nil, nil
 }
