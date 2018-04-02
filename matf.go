@@ -7,25 +7,6 @@ import (
 	"os"
 )
 
-// MAT-File Data Types
-const (
-	MiInt8       int = 1
-	MiUint8      int = 2
-	MiInt16      int = 3
-	MiUint16     int = 4
-	MiInt32      int = 5
-	MiUint32     int = 6
-	MiSingle     int = 7
-	MiDouble     int = 9
-	MiInt64      int = 12
-	MiUint64     int = 13
-	MiMatrix     int = 14
-	MiCompressed int = 15
-	MiUtf8       int = 16
-	MiUtf16      int = 17
-	MiUtf32      int = 18
-)
-
 // Matf represents the MAT-file
 type Matf struct {
 	Header
@@ -71,6 +52,22 @@ func readHeader(mat *Matf, file *os.File) error {
 	}
 
 	return nil
+}
+
+func generateArray(numberOfBytes uint32, dimArray []byte, order binary.ByteOrder) (interface{}, int, int) {
+	var colums, rows uint32 = 1, 1
+
+	colums = order.Uint32(dimArray[4:8])
+	if numberOfBytes == 12 {
+		rows = order.Uint32(dimArray[8:12])
+	}
+
+	array := make([]interface{}, rows)
+	for i := 0; i < int(rows); i++ {
+		array[i] = make([]interface{}, colums)
+	}
+
+	return array, int(colums), int(rows)
 }
 
 func isSmallDataElementFormat(data []byte, order binary.ByteOrder) (bool, error) {
@@ -156,6 +153,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		return MatMatrix{}, err
 	}
 	fmt.Printf("Dimensions Array:\t%v\n", dimArray)
+	generateArray(numberOfBytes, dimArray, order)
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
@@ -198,6 +196,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		offset = 8
 	}
 	fmt.Println("Realpart:\t", dataType, numberOfBytes)
+	extractDataElement(data[index+offset:], order, int(dataType), int(numberOfBytes))
 
 	/*
 		// Imaginary part (optional)
