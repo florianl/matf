@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"reflect"
 )
 
 // Matf represents the MAT-file
@@ -14,10 +15,16 @@ type Matf struct {
 	byteSwapping bool
 }
 
+// Dimensions contains the sizes of a MatMatrix
+type Dimensions struct {
+	x, y, z int
+}
+
 // MatMatrix represents a matrix
 type MatMatrix struct {
-	Name          string
-	Flags         uint32
+	Name  string
+	Flags uint32
+	Dimensions
 	RealPart      interface{}
 	ImaginaryPart interface{}
 }
@@ -54,20 +61,24 @@ func readHeader(mat *Matf, file *os.File) error {
 	return nil
 }
 
-func generateArray(numberOfBytes uint32, dimArray []byte, order binary.ByteOrder) (interface{}, int, int) {
-	var colums, rows uint32 = 1, 1
+func readDimensions(data interface{}) (Dimensions, error) {
+	var dim Dimensions
+	t := reflect.ValueOf(data)
 
-	colums = order.Uint32(dimArray[4:8])
-	if numberOfBytes == 12 {
-		rows = order.Uint32(dimArray[8:12])
+	for i := 0; i < t.Len(); i++ {
+		value := reflect.ValueOf(t.Index(i).Interface()).Int()
+		switch i {
+		case 0:
+			dim.x = int(value)
+		case 1:
+			dim.y = int(value)
+		case 2:
+			dim.z = int(value)
+		default:
+			return Dimensions{}, fmt.Errorf("More dimensions than exptected")
+		}
 	}
-
-	array := make([]interface{}, rows)
-	for i := 0; i < int(rows); i++ {
-		array[i] = make([]interface{}, colums)
-	}
-
-	return array, int(colums), int(rows)
+	return dim, nil
 }
 
 func isSmallDataElementFormat(data []byte, order binary.ByteOrder) (bool, error) {
@@ -139,11 +150,11 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		return MatMatrix{}, err
 	}
 	if small {
-		//dataType = uint32(order.Uint16(data[index+0 : index+2]))
+		dataType = uint32(order.Uint16(data[index+0 : index+2]))
 		numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
 		offset = 4
 	} else {
-		//dataType = order.Uint32(data[index+0 : index+4])
+		dataType = order.Uint32(data[index+0 : index+4])
 		numberOfBytes = order.Uint32(data[index+4 : index+8])
 		offset = 8
 	}
@@ -153,7 +164,11 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		return MatMatrix{}, err
 	}
 	fmt.Printf("Dimensions Array:\t%v\n", dimArray)
-	generateArray(numberOfBytes, dimArray, order)
+	dims, err := extractDataElement(dimArray, order, int(dataType), int(numberOfBytes))
+	if err != nil {
+		return MatMatrix{}, err
+	}
+	matrix.Dimensions, _ = readDimensions(dims)
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
