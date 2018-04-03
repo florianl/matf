@@ -8,6 +8,13 @@ import (
 	"reflect"
 )
 
+// Flags
+const (
+	FlagComplex = 1 << 11
+	FlagGlobal  = 1 << 10
+	FlagLogical = 1 << 9
+)
+
 // Matf represents the MAT-file
 type Matf struct {
 	Header
@@ -111,12 +118,12 @@ func checkIndex(index int) int {
 
 func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	var matrix MatMatrix
-	fmt.Println("extractMatrix()")
 	var index int
 	var offset int
 	var dataType uint32
 	var numberOfBytes uint32
 	var small bool
+	var complexNumber bool
 	var err error
 	var buf *bytes.Reader
 
@@ -140,7 +147,9 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		return MatMatrix{}, err
 	}
 	matrix.Flags = binary.LittleEndian.Uint32(arrayFlags)
-	fmt.Printf("Array Flags:\t%v\t%v\n", arrayFlags, matrix.Flags)
+	if FlagComplex&matrix.Flags == FlagComplex {
+		complexNumber = true
+	}
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
@@ -163,7 +172,6 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	if err := binary.Read(buf, order, &dimArray); err != nil {
 		return MatMatrix{}, err
 	}
-	fmt.Printf("Dimensions Array:\t%v\n", dimArray)
 	dims, err := extractDataElement(dimArray, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return MatMatrix{}, err
@@ -192,7 +200,6 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		return MatMatrix{}, err
 	}
 	matrix.Name = string(arrayName)
-	fmt.Printf("Array Name:\t%v\t%v\n", arrayName, matrix.Name)
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
@@ -210,12 +217,35 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		numberOfBytes = order.Uint32(data[index+4 : index+8])
 		offset = 8
 	}
-	fmt.Println("Realpart:\t", dataType, numberOfBytes)
-	extractDataElement(data[index+offset:], order, int(dataType), int(numberOfBytes))
+	re, err := extractDataElement(data[index+offset:], order, int(dataType), int(numberOfBytes))
+	if err != nil {
+		return MatMatrix{}, err
+	}
+	matrix.RealPart = re
+	index = checkIndex(index)
 
-	/*
-		// Imaginary part (optional)
-	*/
+	// Imaginary part (optional)
+	if complexNumber {
+		small, err = isSmallDataElementFormat(data[index:], order)
+		if err != nil {
+			return MatMatrix{}, err
+		}
+		if small {
+			dataType = uint32(order.Uint16(data[index+0 : index+2]))
+			numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
+			offset = 4
+		} else {
+			dataType = order.Uint32(data[index+0 : index+4])
+			numberOfBytes = order.Uint32(data[index+4 : index+8])
+			offset = 8
+		}
+		im, err := extractDataElement(data[index+offset:], order, int(dataType), int(numberOfBytes))
+		if err != nil {
+			return MatMatrix{}, err
+		}
+		matrix.ImaginaryPart = im
+		index = checkIndex(index)
+	}
 	return matrix, nil
 }
 
@@ -253,6 +283,24 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 		return 0, nil, fmt.Errorf("MiCompressed is not yet implemented")
 	case MiMatrix:
 		extractMatrix(data, order)
+	case MiInt8:
+		fallthrough
+	case MiUint8:
+		fallthrough
+	case MiInt16:
+		fallthrough
+	case MiUint16:
+		fallthrough
+	case MiInt32:
+		fallthrough
+	case MiUint32:
+		fallthrough
+	case MiInt64:
+		fallthrough
+	case MiUint64:
+		extractDataElement(data, order, int(dataType), int(numberOfBytes))
+	default:
+		return int(dataType), nil, fmt.Errorf("Data Type %d is not supported", dataType)
 	}
 
 	return int(dataType), nil, nil
