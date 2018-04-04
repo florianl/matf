@@ -3,6 +3,7 @@ package matf
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 )
 
 // MAT-File Data Types
@@ -54,6 +55,10 @@ func extractDataElement(data []byte, order binary.ByteOrder, dataType, numberOfB
 			i += 8
 		case MiUint64:
 			element = order.Uint64(data[i:])
+			i += 8
+		case MiDouble:
+			bits := order.Uint64(data[i:])
+			element = math.Float64frombits(bits)
 			i += 8
 		default:
 			return nil, fmt.Errorf("Data Type %d is not supported", dataType)

@@ -222,6 +222,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		return MatMatrix{}, err
 	}
 	matrix.RealPart = re
+	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
 	// Imaginary part (optional)
@@ -244,6 +245,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 			return MatMatrix{}, err
 		}
 		matrix.ImaginaryPart = im
+		index += (offset + int(numberOfBytes))
 		index = checkIndex(index)
 	}
 	return matrix, nil
@@ -296,6 +298,8 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 	case MiUint32:
 		fallthrough
 	case MiInt64:
+		fallthrough
+	case MiDouble:
 		fallthrough
 	case MiUint64:
 		extractDataElement(data, order, int(dataType), int(numberOfBytes))
