@@ -320,7 +320,10 @@ func Open(file string) (*Matf, error) {
 	mat := new(Matf)
 	mat.file = f
 
-	readHeader(mat, f)
+	err = readHeader(mat, f)
+	if err != nil {
+		return nil, err
+	}
 
 	return mat, nil
 }
