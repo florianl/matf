@@ -1,0 +1,15 @@
+language: go
+
+go:
+    - 1.9
+    - "1.10"
+    - master
+
+before_install:
+    - sudo apt-get -qq update
+
+# coveralls.io
+after_success:
+    - go get golang.org/x/tools/cmd/cover
+    - go get github.com/mattn/goveralls
+    - $GOPATH/bin/goveralls -service=travis-ci
