@@ -25,7 +25,7 @@ const (
 	MiUtf32      int = 18
 )
 
-func extractDataElement(data []byte, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, error) {
+func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, error) {
 
 	var element interface{}
 	var elements []interface{}
@@ -33,31 +33,31 @@ func extractDataElement(data []byte, order binary.ByteOrder, dataType, numberOfB
 	for i := 0; i < numberOfBytes; {
 		switch dataType {
 		case MiInt8:
-			element = int8(data[i])
+			element = int8((*data)[i])
 			i++
 		case MiUint8:
-			element = uint8(data[i])
+			element = uint8((*data)[i])
 			i++
 		case MiInt16:
-			element = int16(order.Uint16(data[i:]))
+			element = int16(order.Uint16((*data)[i:]))
 			i += 2
 		case MiUint16:
-			element = order.Uint16(data[i:])
+			element = order.Uint16((*data)[i:])
 			i += 2
 		case MiInt32:
-			element = int32(order.Uint32(data[i:]))
+			element = int32(order.Uint32((*data)[i:]))
 			i += 4
 		case MiUint32:
-			element = order.Uint32(data[i:])
+			element = order.Uint32((*data)[i:])
 			i += 4
 		case MiInt64:
-			element = int64(order.Uint64(data[i:]))
+			element = int64(order.Uint64((*data)[i:]))
 			i += 8
 		case MiUint64:
-			element = order.Uint64(data[i:])
+			element = order.Uint64((*data)[i:])
 			i += 8
 		case MiDouble:
-			bits := order.Uint64(data[i:])
+			bits := order.Uint64((*data)[i:])
 			element = math.Float64frombits(bits)
 			i += 8
 		default:

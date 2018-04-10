@@ -172,7 +172,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	if err := binary.Read(buf, order, &dimArray); err != nil {
 		return MatMatrix{}, err
 	}
-	dims, err := extractDataElement(dimArray, order, int(dataType), int(numberOfBytes))
+	dims, err := extractDataElement(&dimArray, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return MatMatrix{}, err
 	}
@@ -217,7 +217,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		numberOfBytes = order.Uint32(data[index+4 : index+8])
 		offset = 8
 	}
-	re, err := extractDataElement(data[index+offset:], order, int(dataType), int(numberOfBytes))
+	tmp := data[index+offset:]
+	re, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return MatMatrix{}, err
 	}
@@ -240,7 +241,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 			numberOfBytes = order.Uint32(data[index+4 : index+8])
 			offset = 8
 		}
-		im, err := extractDataElement(data[index+offset:], order, int(dataType), int(numberOfBytes))
+		tmp := data[index+offset:]
+		im, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 		if err != nil {
 			return MatMatrix{}, err
 		}
@@ -302,7 +304,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 	case MiDouble:
 		fallthrough
 	case MiUint64:
-		extractDataElement(data, order, int(dataType), int(numberOfBytes))
+		extractDataElement(&data, order, int(dataType), int(numberOfBytes))
 	default:
 		return int(dataType), nil, fmt.Errorf("Data Type %d is not supported", dataType)
 	}
