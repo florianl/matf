@@ -24,7 +24,7 @@ type Matf struct {
 
 // Dimensions contains the sizes of a MatMatrix
 type Dimensions struct {
-	x, y, z int
+	X, Y, Z int
 }
 
 // MatMatrix represents a matrix
@@ -39,9 +39,9 @@ type MatMatrix struct {
 // Header contains informations about the MAT-file
 type Header struct {
 	Text                string // 0 - 116
-	SubsystemDataOffset []byte // 117 - 124
+	subsystemDataOffset []byte // 117 - 124
 	Version             uint16 // 125 - 126
-	EndianIndicator     uint16 // 127 - 128
+	endianIndicator     uint16 // 127 - 128
 }
 
 func readHeader(mat *Matf, file *os.File) error {
@@ -56,11 +56,11 @@ func readHeader(mat *Matf, file *os.File) error {
 	}
 
 	mat.Header.Text = string(data[:116])
-	mat.Header.SubsystemDataOffset = data[116:124]
+	mat.Header.subsystemDataOffset = data[116:124]
 	mat.Header.Version = binary.BigEndian.Uint16(data[124:126])
-	mat.Header.EndianIndicator = binary.BigEndian.Uint16(data[126:128])
+	mat.Header.endianIndicator = binary.BigEndian.Uint16(data[126:128])
 
-	if mat.Header.EndianIndicator == binary.BigEndian.Uint16([]byte{0x49, 0x4d}) {
+	if mat.Header.endianIndicator == binary.BigEndian.Uint16([]byte{0x49, 0x4d}) {
 		// EndianIndicator is IM rather than MI
 		mat.byteSwapping = true
 	}
@@ -76,11 +76,11 @@ func readDimensions(data interface{}) (Dimensions, error) {
 		value := reflect.ValueOf(t.Index(i).Interface()).Int()
 		switch i {
 		case 0:
-			dim.x = int(value)
+			dim.X = int(value)
 		case 1:
-			dim.y = int(value)
+			dim.Y = int(value)
 		case 2:
-			dim.z = int(value)
+			dim.Z = int(value)
 		default:
 			return Dimensions{}, fmt.Errorf("More dimensions than exptected")
 		}
@@ -267,6 +267,7 @@ func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {
 }
 
 func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, error) {
+	var element interface{}
 	tag, err := readBytes(m, 8)
 	if err != nil {
 		return 0, nil, err
@@ -274,8 +275,6 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 
 	dataType := order.Uint32(tag[:4])
 	numberOfBytes := order.Uint32(tag[4:8])
-
-	fmt.Println("DataType: ", dataType, "\tNumberOfBytes: ", numberOfBytes)
 
 	data, err := readBytes(m, int(numberOfBytes))
 	if err != nil {
@@ -286,7 +285,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 	case MiCompressed:
 		return 0, nil, fmt.Errorf("MiCompressed is not yet implemented")
 	case MiMatrix:
-		extractMatrix(data, order)
+		element, err = extractMatrix(data, order)
 	case MiInt8:
 		fallthrough
 	case MiUint8:
@@ -304,12 +303,16 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 	case MiDouble:
 		fallthrough
 	case MiUint64:
-		extractDataElement(&data, order, int(dataType), int(numberOfBytes))
+		element, err = extractDataElement(&data, order, int(dataType), int(numberOfBytes))
 	default:
 		return int(dataType), nil, fmt.Errorf("Data Type %d is not supported", dataType)
 	}
 
-	return int(dataType), nil, nil
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return int(dataType), element, nil
 }
 
 // Open a MAT-file
