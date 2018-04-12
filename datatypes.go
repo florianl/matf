@@ -25,6 +25,25 @@ const (
 	MiUtf32      int = 18
 )
 
+// MAT-File Array Types
+const (
+	MxCellClass   int = 1
+	MxStructClass int = 2
+	MxObjectClass int = 3
+	MxCharClass   int = 4
+	MxSparseClass int = 5
+	MxDoubleClass int = 6
+	MxSingleClass int = 7
+	MxInt8Class   int = 8
+	MxUint8Class  int = 9
+	MxInt16Class  int = 10
+	MxUint16Class int = 11
+	MxInt32Class  int = 12
+	MxUint32Class int = 13
+	MxInt64Class  int = 14
+	MxUint64Class int = 15
+)
+
 func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, error) {
 
 	var element interface{}

@@ -12,6 +12,7 @@ import (
 
 // Flags
 const (
+	ClassMask   = 0x0F
 	FlagComplex = 1 << 11
 	FlagGlobal  = 1 << 10
 	FlagLogical = 1 << 9
@@ -33,6 +34,7 @@ type Dimensions struct {
 type MatMatrix struct {
 	Name  string
 	Flags uint32
+	Class uint32
 	Dimensions
 	RealPart      interface{}
 	ImaginaryPart interface{}
@@ -151,6 +153,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	matrix.Flags = binary.LittleEndian.Uint32(arrayFlags)
 	if FlagComplex&matrix.Flags == FlagComplex {
 		complexNumber = true
+	}
+	matrix.Class = matrix.Flags & 0x0F
+	if matrix.Class < uint32(MxDoubleClass) {
+		return MatMatrix{}, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
 	}
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
