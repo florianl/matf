@@ -2,8 +2,10 @@ package matf
 
 import (
 	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 )
@@ -179,7 +181,6 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	matrix.Dimensions, _ = readDimensions(dims)
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
-
 	// Array Name
 	small, err = isSmallDataElementFormat(data[index:], order)
 	if err != nil {
@@ -266,24 +267,44 @@ func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {
 	return data, nil
 }
 
+func decompressData(data []byte) ([]byte, error) {
+	tmp := bytes.NewReader(data)
+	var out bytes.Buffer
+	r, err := zlib.NewReader(tmp)
+	if r != nil && err == nil {
+		io.Copy(&out, r)
+	}
+	return out.Bytes(), err
+}
+
 func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, error) {
 	var element interface{}
+	var data []byte
+	var dataType, numberOfBytes uint32
 	tag, err := readBytes(m, 8)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	dataType := order.Uint32(tag[:4])
-	numberOfBytes := order.Uint32(tag[4:8])
+	dataType = order.Uint32(tag[:4])
+	numberOfBytes = order.Uint32(tag[4:8])
 
-	data, err := readBytes(m, int(numberOfBytes))
+	data, err = readBytes(m, int(numberOfBytes))
 	if err != nil {
 		return 0, nil, err
 	}
 
+	if dataType == uint32(MiCompressed) {
+		plain, err := decompressData(data)
+		if err != nil {
+			return 0, nil, err
+		}
+		dataType = order.Uint32(plain[:4])
+		numberOfBytes = order.Uint32(plain[4:8])
+		data = plain[8:]
+	}
+
 	switch int(dataType) {
-	case MiCompressed:
-		return 0, nil, fmt.Errorf("MiCompressed is not yet implemented")
 	case MiMatrix:
 		element, err = extractMatrix(data, order)
 	case MiInt8:

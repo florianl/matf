@@ -29,9 +29,15 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 
 	var element interface{}
 	var elements []interface{}
+	var err error
 
 	for i := 0; i < numberOfBytes; {
 		switch dataType {
+		case MiMatrix:
+			element, err = extractMatrix(*data, order)
+			if err != nil {
+				return nil, err
+			}
 		case MiInt8:
 			element = int8((*data)[i])
 			i++
