@@ -30,14 +30,26 @@ type Dimensions struct {
 	X, Y, Z int
 }
 
+// NumPrt contains the numeric part of a matrix
+type NumPrt struct {
+	RealPart      interface{}
+	ImaginaryPart interface{}
+}
+
+// StructPrt represents a matf struct
+type StructPrt struct {
+	FieldName  string
+	FieldValue interface{}
+}
+
 // MatMatrix represents a matrix
 type MatMatrix struct {
 	Name  string
 	Flags uint32
 	Class uint32
 	Dimensions
-	RealPart      interface{}
-	ImaginaryPart interface{}
+	NumPrt
+	StructPrt
 }
 
 // Header contains informations about the MAT-file
@@ -155,9 +167,6 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		complexNumber = true
 	}
 	matrix.Class = matrix.Flags & 0x0F
-	if matrix.Class < uint32(MxDoubleClass) {
-		return MatMatrix{}, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
-	}
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
@@ -210,52 +219,24 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 
-	// Real part
-	small, err = isSmallDataElementFormat(data[index:], order)
-	if err != nil {
-		return MatMatrix{}, err
-	}
-	if small {
-		dataType = uint32(order.Uint16(data[index+0 : index+2]))
-		numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
-		offset = 4
-	} else {
-		dataType = order.Uint32(data[index+0 : index+4])
-		numberOfBytes = order.Uint32(data[index+4 : index+8])
-		offset = 8
-	}
-	tmp := data[index+offset:]
-	re, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-	if err != nil {
-		return MatMatrix{}, err
-	}
-	matrix.RealPart = re
-	index += (offset + int(numberOfBytes))
-	index = checkIndex(index)
-
-	// Imaginary part (optional)
-	if complexNumber {
-		small, err = isSmallDataElementFormat(data[index:], order)
-		if err != nil {
-			return MatMatrix{}, err
-		}
-		if small {
-			dataType = uint32(order.Uint16(data[index+0 : index+2]))
-			numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
-			offset = 4
-		} else {
-			dataType = order.Uint32(data[index+0 : index+4])
-			numberOfBytes = order.Uint32(data[index+4 : index+8])
-			offset = 8
-		}
-		tmp := data[index+offset:]
-		im, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-		if err != nil {
-			return MatMatrix{}, err
-		}
-		matrix.ImaginaryPart = im
-		index += (offset + int(numberOfBytes))
+	switch int(matrix.Class) {
+	case MxDoubleClass:
+		// Real part
+		tmp := data[index:]
+		re, used, _ := extractNumeric(&tmp, order)
+		matrix.RealPart = re
+		index += used
 		index = checkIndex(index)
+		// Imaginary part (optional)
+		if complexNumber {
+			tmp = data[index:]
+			im, used, _ := extractNumeric(&tmp, order)
+			matrix.ImaginaryPart = im
+			index += used
+			index = checkIndex(index)
+		}
+	default:
+		return MatMatrix{}, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
 	}
 	return matrix, nil
 }

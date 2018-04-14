@@ -92,3 +92,31 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 	}
 	return elements, nil
 }
+
+func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, error) {
+	var offset int
+	var err error
+	var small bool
+	var dataType uint32
+	var numberOfBytes uint32
+
+	small, err = isSmallDataElementFormat((*data), order)
+	if err != nil {
+		return nil, 0, err
+	}
+	if small {
+		dataType = uint32(order.Uint16((*data)[:2]))
+		numberOfBytes = uint32(order.Uint16((*data)[2:4]))
+		offset = 4
+	} else {
+		dataType = order.Uint32((*data)[:4])
+		numberOfBytes = order.Uint32((*data)[4:8])
+		offset = 8
+	}
+	tmp := (*data)[offset:]
+	re, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+	if err != nil {
+		return nil, 0, err
+	}
+	return re, offset + int(numberOfBytes), err
+}
