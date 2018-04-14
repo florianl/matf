@@ -38,8 +38,8 @@ type NumPrt struct {
 
 // StructPrt represents a matf struct
 type StructPrt struct {
-	FieldName  string
-	FieldValue interface{}
+	FieldNames  []string
+	FieldValues []interface{}
 }
 
 // MatMatrix represents a matrix
@@ -220,7 +220,46 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	index = checkIndex(index)
 
 	switch int(matrix.Class) {
+	case MxStructClass:
+		var elements []interface{}
+		// Field Name Length
+		fieldNameLength := order.Uint32(data[index+4 : index+8])
+		// Field Names
+		numberOfFields := order.Uint32(data[index+12:index+16]) / fieldNameLength
+		index = checkIndex(index + 16)
+		tmp := data[index:]
+		fieldNames, _ := extractFieldNames(&tmp, order, int(fieldNameLength), int(numberOfFields))
+		matrix.FieldNames = fieldNames
+		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
+		// Field Values
+		for ; numberOfFields > 0; numberOfFields-- {
+			var element interface{}
+			dataType := order.Uint32(data[index : index+4])
+			numberOfBytes := order.Uint32(data[index+4 : index+8])
+			tmp := data[index+8:]
+			element, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+			index = checkIndex(index + 8 + int(numberOfBytes))
+			if err != nil {
+				return MatMatrix{}, err
+			}
+			elements = append(elements, element)
+		}
+		matrix.FieldValues = elements
 	case MxDoubleClass:
+		fallthrough
+	case MxSingleClass:
+		fallthrough
+	case MxInt8Class:
+		fallthrough
+	case MxUint8Class:
+		fallthrough
+	case MxInt16Class:
+		fallthrough
+	case MxUint16Class:
+		fallthrough
+	case MxInt32Class:
+		fallthrough
+	case MxUint32Class:
 		// Real part
 		tmp := data[index:]
 		re, used, _ := extractNumeric(&tmp, order)
@@ -291,31 +330,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 		data = plain[8:]
 	}
 
-	switch int(dataType) {
-	case MiMatrix:
-		element, err = extractMatrix(data, order)
-	case MiInt8:
-		fallthrough
-	case MiUint8:
-		fallthrough
-	case MiInt16:
-		fallthrough
-	case MiUint16:
-		fallthrough
-	case MiInt32:
-		fallthrough
-	case MiUint32:
-		fallthrough
-	case MiInt64:
-		fallthrough
-	case MiDouble:
-		fallthrough
-	case MiUint64:
-		element, err = extractDataElement(&data, order, int(dataType), int(numberOfBytes))
-	default:
-		return int(dataType), nil, fmt.Errorf("Data Type %d is not supported", dataType)
-	}
-
+	element, err = extractDataElement(&data, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return 0, nil, err
 	}

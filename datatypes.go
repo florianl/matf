@@ -57,6 +57,7 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 			if err != nil {
 				return nil, err
 			}
+			return element, nil
 		case MiInt8:
 			element = int8((*data)[i])
 			i++
@@ -119,4 +120,15 @@ func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, err
 		return nil, 0, err
 	}
 	return re, offset + int(numberOfBytes), err
+}
+
+func extractFieldNames(data *[]byte, order binary.ByteOrder, fieldNameLength, numberOfFields int) ([]string, error) {
+	var index int
+	var names []string
+	for ; numberOfFields > 0; numberOfFields-- {
+		str := string((*data)[index : index+fieldNameLength])
+		names = append(names, str)
+		index += fieldNameLength
+	}
+	return names, nil
 }
