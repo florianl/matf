@@ -228,7 +228,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 		numberOfFields := order.Uint32(data[index+12:index+16]) / fieldNameLength
 		index = checkIndex(index + 16)
 		tmp := data[index:]
-		fieldNames, _ := extractFieldNames(&tmp, order, int(fieldNameLength), int(numberOfFields))
+		fieldNames, _ := extractFieldNames(&tmp, int(fieldNameLength), int(numberOfFields))
 		matrix.FieldNames = fieldNames
 		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
 		// Field Values

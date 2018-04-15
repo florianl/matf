@@ -122,7 +122,7 @@ func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, err
 	return re, offset + int(numberOfBytes), err
 }
 
-func extractFieldNames(data *[]byte, order binary.ByteOrder, fieldNameLength, numberOfFields int) ([]string, error) {
+func extractFieldNames(data *[]byte, fieldNameLength, numberOfFields int) ([]string, error) {
 	var index int
 	var names []string
 	for ; numberOfFields > 0; numberOfFields-- {
