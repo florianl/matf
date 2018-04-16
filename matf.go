@@ -120,7 +120,7 @@ func isSmallDataElementFormat(data []byte, order binary.ByteOrder) (bool, error)
 	small := make([]byte, 2)
 	buf := bytes.NewReader(data[offset:])
 	if err := binary.Read(buf, order, &small); err != nil {
-		return false, fmt.Errorf("Could not read bytes:", err)
+		return false, fmt.Errorf("Could not read bytes: %v", err)
 	}
 	if small[0] != small[1] {
 		// Small Data Element Format
