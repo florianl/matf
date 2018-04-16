@@ -42,6 +42,11 @@ type StructPrt struct {
 	FieldValues []interface{}
 }
 
+// CellPrt represnts a list of matf cells
+type CellPrt struct {
+	Cells []MatMatrix
+}
+
 // MatMatrix represents a matrix
 type MatMatrix struct {
 	Name  string
@@ -50,6 +55,7 @@ type MatMatrix struct {
 	Dimensions
 	NumPrt
 	StructPrt
+	CellPrt
 }
 
 // Header contains informations about the MAT-file
@@ -132,7 +138,7 @@ func checkIndex(index int) int {
 	}
 }
 
-func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
+func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) {
 	var matrix MatMatrix
 	var index int
 	var offset int
@@ -142,11 +148,12 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	var complexNumber bool
 	var err error
 	var buf *bytes.Reader
+	var maxLen = len(data)
 
 	// Array Flags
 	small, err = isSmallDataElementFormat(data[index:], order)
 	if err != nil {
-		return MatMatrix{}, err
+		return MatMatrix{}, 0, err
 	}
 	if small {
 		//dataType = uint32(order.Uint16(data[index+0 : index+2]))
@@ -160,7 +167,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	arrayFlags := make([]byte, int(numberOfBytes))
 	buf = bytes.NewReader(data[index+offset:])
 	if err := binary.Read(buf, order, &arrayFlags); err != nil {
-		return MatMatrix{}, err
+		return MatMatrix{}, 0, err
 	}
 	matrix.Flags = binary.LittleEndian.Uint32(arrayFlags)
 	if FlagComplex&matrix.Flags == FlagComplex {
@@ -173,7 +180,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	// Dimensions Array
 	small, err = isSmallDataElementFormat(data[index:], order)
 	if err != nil {
-		return MatMatrix{}, err
+		return MatMatrix{}, 0, err
 	}
 	if small {
 		dataType = uint32(order.Uint16(data[index+0 : index+2]))
@@ -187,39 +194,32 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 	dimArray := make([]byte, int(numberOfBytes))
 	buf = bytes.NewReader(data[index+offset:])
 	if err := binary.Read(buf, order, &dimArray); err != nil {
-		return MatMatrix{}, err
+		return MatMatrix{}, 0, err
 	}
 	dims, err := extractDataElement(&dimArray, order, int(dataType), int(numberOfBytes))
 	if err != nil {
-		return MatMatrix{}, err
+		return MatMatrix{}, 0, err
 	}
 	matrix.Dimensions, _ = readDimensions(dims)
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 	// Array Name
-	small, err = isSmallDataElementFormat(data[index:], order)
-	if err != nil {
-		return MatMatrix{}, err
-	}
-	if small {
-		//dataType = uint32(order.Uint16(data[index+0 : index+2]))
-		numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
-		offset = 4
-	} else {
-		//dataType = order.Uint32(data[index+0 : index+4])
-		numberOfBytes = order.Uint32(data[index+4 : index+8])
-		offset = 8
-	}
-	arrayName := make([]byte, int(numberOfBytes))
-	buf = bytes.NewReader(data[index+offset:])
-	if err := binary.Read(buf, order, &arrayName); err != nil {
-		return MatMatrix{}, err
-	}
-	matrix.Name = string(arrayName)
-	index += (offset + int(numberOfBytes))
-	index = checkIndex(index)
+	tmp := data[index:]
+	arrayName, step, err := extractArrayName(&tmp, order)
+	matrix.Name = arrayName
+	index = checkIndex(index + step)
 
 	switch int(matrix.Class) {
+	case MxCellClass:
+		for {
+			if index >= maxLen {
+				break
+			}
+			tmp := data[index+8:]
+			element, step, _ := extractMatrix(tmp, order)
+			matrix.Cells = append(matrix.Cells, element)
+			index = checkIndex(index + 8 + step)
+		}
 	case MxStructClass:
 		var elements []interface{}
 		// Field Name Length
@@ -240,7 +240,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 			element, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 			index = checkIndex(index + 8 + int(numberOfBytes))
 			if err != nil {
-				return MatMatrix{}, err
+				return MatMatrix{}, 0, err
 			}
 			elements = append(elements, element)
 		}
@@ -275,9 +275,9 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, error) {
 			index = checkIndex(index)
 		}
 	default:
-		return MatMatrix{}, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
+		return MatMatrix{}, 0, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
 	}
-	return matrix, nil
+	return matrix, index, nil
 }
 
 func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {

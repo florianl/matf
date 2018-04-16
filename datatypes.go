@@ -1,6 +1,7 @@
 package matf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -53,7 +54,7 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 	for i := 0; i < numberOfBytes; {
 		switch dataType {
 		case MiMatrix:
-			element, err = extractMatrix(*data, order)
+			element, _, err = extractMatrix(*data, order)
 			if err != nil {
 				return nil, err
 			}
@@ -131,4 +132,28 @@ func extractFieldNames(data *[]byte, fieldNameLength, numberOfFields int) ([]str
 		index += fieldNameLength
 	}
 	return names, nil
+}
+
+func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error) {
+	var numberOfBytes uint32
+	var offset int
+	small, err := isSmallDataElementFormat(*data, order)
+	if err != nil {
+		return "", 0, err
+	}
+	if small {
+		//dataType = uint32(order.Uint16(data[index+0 : index+2]))
+		numberOfBytes = uint32(order.Uint16((*data)[2:4]))
+		offset = 4
+	} else {
+		//dataType = order.Uint32(data[index+0 : index+4])
+		numberOfBytes = order.Uint32((*data)[4:8])
+		offset = 8
+	}
+	arrayName := make([]byte, int(numberOfBytes))
+	buf := bytes.NewReader((*data)[offset:])
+	if err := binary.Read(buf, order, &arrayName); err != nil {
+		return "", 0, err
+	}
+	return string(arrayName), offset + int(numberOfBytes), nil
 }
