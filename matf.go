@@ -144,25 +144,15 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	var offset int
 	var dataType uint32
 	var numberOfBytes uint32
-	var small bool
 	var complexNumber bool
 	var err error
 	var buf *bytes.Reader
 	var maxLen = len(data)
 
 	// Array Flags
-	small, err = isSmallDataElementFormat(data[index:], order)
+	_, numberOfBytes, offset, err = extractTag(&data, order)
 	if err != nil {
 		return MatMatrix{}, 0, err
-	}
-	if small {
-		//dataType = uint32(order.Uint16(data[index+0 : index+2]))
-		numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
-		offset = 4
-	} else {
-		//dataType = order.Uint32(data[index+0 : index+4])
-		numberOfBytes = order.Uint32(data[index+4 : index+8])
-		offset = 8
 	}
 	arrayFlags := make([]byte, int(numberOfBytes))
 	buf = bytes.NewReader(data[index+offset:])
@@ -178,18 +168,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	index = checkIndex(index)
 
 	// Dimensions Array
-	small, err = isSmallDataElementFormat(data[index:], order)
+	tmp := data[index:]
+	dataType, numberOfBytes, offset, err = extractTag(&tmp, order)
 	if err != nil {
 		return MatMatrix{}, 0, err
-	}
-	if small {
-		dataType = uint32(order.Uint16(data[index+0 : index+2]))
-		numberOfBytes = uint32(order.Uint16(data[index+2 : index+4]))
-		offset = 4
-	} else {
-		dataType = order.Uint32(data[index+0 : index+4])
-		numberOfBytes = order.Uint32(data[index+4 : index+8])
-		offset = 8
 	}
 	dimArray := make([]byte, int(numberOfBytes))
 	buf = bytes.NewReader(data[index+offset:])
@@ -204,7 +186,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	index += (offset + int(numberOfBytes))
 	index = checkIndex(index)
 	// Array Name
-	tmp := data[index:]
+	tmp = data[index:]
 	arrayName, step, err := extractArrayName(&tmp, order)
 	matrix.Name = arrayName
 	index = checkIndex(index + step)

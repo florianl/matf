@@ -96,24 +96,10 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 }
 
 func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, error) {
-	var offset int
-	var err error
-	var small bool
-	var dataType uint32
-	var numberOfBytes uint32
 
-	small, err = isSmallDataElementFormat((*data), order)
+	dataType, numberOfBytes, offset, err := extractTag(data, order)
 	if err != nil {
 		return nil, 0, err
-	}
-	if small {
-		dataType = uint32(order.Uint16((*data)[:2]))
-		numberOfBytes = uint32(order.Uint16((*data)[2:4]))
-		offset = 4
-	} else {
-		dataType = order.Uint32((*data)[:4])
-		numberOfBytes = order.Uint32((*data)[4:8])
-		offset = 8
 	}
 	tmp := (*data)[offset:]
 	re, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
@@ -135,20 +121,9 @@ func extractFieldNames(data *[]byte, fieldNameLength, numberOfFields int) ([]str
 }
 
 func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error) {
-	var numberOfBytes uint32
-	var offset int
-	small, err := isSmallDataElementFormat(*data, order)
+	_, numberOfBytes, offset, err := extractTag(data, order)
 	if err != nil {
 		return "", 0, err
-	}
-	if small {
-		//dataType = uint32(order.Uint16(data[index+0 : index+2]))
-		numberOfBytes = uint32(order.Uint16((*data)[2:4]))
-		offset = 4
-	} else {
-		//dataType = order.Uint32(data[index+0 : index+4])
-		numberOfBytes = order.Uint32((*data)[4:8])
-		offset = 8
 	}
 	arrayName := make([]byte, int(numberOfBytes))
 	buf := bytes.NewReader((*data)[offset:])
@@ -156,4 +131,25 @@ func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error)
 		return "", 0, err
 	}
 	return string(arrayName), offset + int(numberOfBytes), nil
+}
+
+func extractTag(data *[]byte, order binary.ByteOrder) (uint32, uint32, int, error) {
+	var dataType, numberOfBytes uint32
+	var offset int
+
+	small, err := isSmallDataElementFormat(*data, order)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	if small {
+		dataType = uint32(order.Uint16((*data)[0:2]))
+		numberOfBytes = uint32(order.Uint16((*data)[2:4]))
+		offset = 4
+	} else {
+		dataType = order.Uint32((*data)[0:4])
+		numberOfBytes = order.Uint32((*data)[4:8])
+		offset = 8
+	}
+
+	return dataType, numberOfBytes, offset, nil
 }
