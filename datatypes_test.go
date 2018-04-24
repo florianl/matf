@@ -77,3 +77,61 @@ func TestExtractNumeric(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractFieldNames(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		data            *[]byte
+		fieldNameLength int
+		numberOfFields  int
+		fields          []string
+		err             string
+	}{
+		{name: "['abc']", data: &([]byte{0x61, 0x62, 0x63}), fieldNameLength: 3, numberOfFields: 1, fields: []string{"abc"}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			fields, err := extractFieldNames(tc.data, tc.fieldNameLength, tc.numberOfFields)
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				}
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			fmt.Println(fields, tc.fields)
+		})
+	}
+}
+
+func TestExtractArrayName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		data      *[]byte
+		order     binary.ByteOrder
+		arrayName string
+		step      int
+		err       string
+	}{
+		{name: "ThisIsALongerName", data: &([]byte{0x01, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x54, 0x68, 0x69, 0x73, 0x49, 0x73, 0x41, 0x4c, 0x6f, 0x6e, 0x67, 0x65, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}), order: binary.LittleEndian, step: 25, arrayName: "ThisIsALongerName"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			name, step, err := extractArrayName(tc.data, tc.order)
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				}
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			fmt.Println(name, tc.arrayName, "\t", step, tc.step)
+		})
+	}
+}
