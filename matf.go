@@ -198,7 +198,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 				break
 			}
 			tmp := data[index+8:]
-			element, step, _ := extractMatrix(tmp, order)
+			element, step, err := extractMatrix(tmp, order)
+			if err != nil {
+				return MatMatrix{}, 0, err
+			}
 			matrix.Cells = append(matrix.Cells, element)
 			index = checkIndex(index + 8 + step)
 		}
