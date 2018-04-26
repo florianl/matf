@@ -230,6 +230,23 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			elements = append(elements, element)
 		}
 		matrix.FieldValues = elements
+	case MxCharClass:
+		tmp := data[index:]
+		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
+		tmp = data[index : index+int(offset)+int(numberOfBytes)]
+		name, _, _ := extractArrayName(&tmp, order)
+		index = checkIndex(index + int(offset) + int(numberOfBytes))
+		for {
+			if index >= maxLen {
+				break
+			}
+			tmp := data[index+8:]
+			element, step, err := extractMatrix(tmp, order)
+			if err != nil {
+				return MatMatrix{}, 0, err
+			}
+			index = checkIndex(index + 8 + step)
+		}
 	case MxDoubleClass:
 		fallthrough
 	case MxSingleClass:
