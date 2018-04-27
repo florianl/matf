@@ -42,9 +42,15 @@ type StructPrt struct {
 	FieldValues []interface{}
 }
 
-// CellPrt represnts a list of matf cells
+// CellPrt represents a list of matf cells
 type CellPrt struct {
 	Cells []MatMatrix
+}
+
+// CharPrt represents a matf char array
+type CharPrt struct {
+	CharName   string
+	CharValues []interface{}
 }
 
 // MatMatrix represents a matrix
@@ -56,6 +62,7 @@ type MatMatrix struct {
 	NumPrt
 	StructPrt
 	CellPrt
+	CharPrt
 }
 
 // Header contains informations about the MAT-file
@@ -219,11 +226,11 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		// Field Values
 		for ; numberOfFields > 0; numberOfFields-- {
 			var element interface{}
-			dataType := order.Uint32(data[index : index+4])
-			numberOfBytes := order.Uint32(data[index+4 : index+8])
-			tmp := data[index+8:]
+			tmp := data[index:]
+			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
+			tmp = data[index+offset:]
 			element, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-			index = checkIndex(index + 8 + int(numberOfBytes))
+			index = checkIndex(index + offset + int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
@@ -235,17 +242,26 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
 		tmp = data[index : index+int(offset)+int(numberOfBytes)]
 		name, _, _ := extractArrayName(&tmp, order)
+		matrix.CharName = name
 		index = checkIndex(index + int(offset) + int(numberOfBytes))
+		var counter int
 		for {
 			if index >= maxLen {
 				break
 			}
-			tmp := data[index+8:]
-			element, step, err := extractMatrix(tmp, order)
+			counter++
+			if counter > 3 {
+				break
+			}
+			tmp := data[index:]
+			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
+			tmp = data[index+offset:]
+			element, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
-			index = checkIndex(index + 8 + step)
+			matrix.CharValues = append(matrix.CharValues, element)
+			index = checkIndex(index + offset + int(numberOfBytes))
 		}
 	case MxDoubleClass:
 		fallthrough
