@@ -126,6 +126,9 @@ func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error)
 	if err != nil {
 		return "", 0, err
 	}
+	if numberOfBytes == 0 {
+		return "", offset, nil
+	}
 	arrayName := make([]byte, int(numberOfBytes))
 	buf := bytes.NewReader((*data)[offset:])
 	if err := binary.Read(buf, order, &arrayName); err != nil {
