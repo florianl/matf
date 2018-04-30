@@ -306,7 +306,7 @@ func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {
 	}
 
 	if count != numberOfBytes {
-		return nil, fmt.Errorf("Could not read enough bytes")
+		return nil, fmt.Errorf("Could not read %d bytes", numberOfBytes)
 	}
 	return data, nil
 }
@@ -315,6 +315,10 @@ func decompressData(data []byte) ([]byte, error) {
 	tmp := bytes.NewReader(data)
 	var out bytes.Buffer
 	r, err := zlib.NewReader(tmp)
+	defer r.Close()
+	if err != nil {
+		return []byte{}, err
+	}
 	if r != nil && err == nil {
 		io.Copy(&out, r)
 	}
@@ -339,7 +343,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, er
 	}
 
 	if dataType == uint32(MiCompressed) {
-		plain, err := decompressData(data)
+		plain, err := decompressData(data[:numberOfBytes])
 		if err != nil {
 			return 0, nil, err
 		}
