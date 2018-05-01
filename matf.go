@@ -220,7 +220,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		numberOfFields := order.Uint32(data[index+12:index+16]) / fieldNameLength
 		index = checkIndex(index + 16)
 		tmp := data[index:]
-		fieldNames, _ := extractFieldNames(&tmp, int(fieldNameLength), int(numberOfFields))
+		fieldNames, err := extractFieldNames(&tmp, int(fieldNameLength), int(numberOfFields))
+		if err != nil {
+			return MatMatrix{}, 0, err
+		}
 		matrix.FieldNames = fieldNames
 		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
 		// Field Values
@@ -230,10 +233,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
 			tmp = data[index+offset:]
 			element, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-			index = checkIndex(index + offset + int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
+			index = checkIndex(index + offset + int(numberOfBytes))
 			elements = append(elements, element)
 		}
 		matrix.FieldValues = elements
@@ -241,7 +244,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		tmp := data[index:]
 		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
 		tmp = data[index : index+int(offset)+int(numberOfBytes)]
-		name, _, _ := extractArrayName(&tmp, order)
+		name, _, err := extractArrayName(&tmp, order)
+		if err != nil {
+			return MatMatrix{}, 0, err
+		}
 		matrix.CharName = name
 		index = checkIndex(index + int(offset) + int(numberOfBytes))
 		var counter int
