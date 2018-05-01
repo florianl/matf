@@ -59,10 +59,7 @@ type MatMatrix struct {
 	Flags uint32
 	Class uint32
 	Dimensions
-	NumPrt
-	StructPrt
-	CellPrt
-	CharPrt
+	Content interface{}
 }
 
 // Header contains informations about the MAT-file
@@ -200,6 +197,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 
 	switch int(matrix.Class) {
 	case MxCellClass:
+		var content CellPrt
 		for {
 			if index >= maxLen {
 				break
@@ -209,11 +207,13 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
-			matrix.Cells = append(matrix.Cells, element)
+			content.Cells = append(content.Cells, element)
 			index = checkIndex(index + 8 + step)
 		}
+		matrix.Content = content
 	case MxStructClass:
 		var elements []interface{}
+		var content StructPrt
 		// Field Name Length
 		fieldNameLength := order.Uint32(data[index+4 : index+8])
 		// Field Names
@@ -224,7 +224,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		if err != nil {
 			return MatMatrix{}, 0, err
 		}
-		matrix.FieldNames = fieldNames
+		content.FieldNames = fieldNames
 		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
 		// Field Values
 		for ; numberOfFields > 0; numberOfFields-- {
@@ -239,8 +239,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			index = checkIndex(index + offset + int(numberOfBytes))
 			elements = append(elements, element)
 		}
-		matrix.FieldValues = elements
+		content.FieldValues = elements
+		matrix.Content = content
 	case MxCharClass:
+		var content CharPrt
 		tmp := data[index:]
 		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
 		tmp = data[index : index+int(offset)+int(numberOfBytes)]
@@ -248,7 +250,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		if err != nil {
 			return MatMatrix{}, 0, err
 		}
-		matrix.CharName = name
+		content.CharName = name
 		index = checkIndex(index + int(offset) + int(numberOfBytes))
 		var counter int
 		for {
@@ -266,9 +268,10 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
-			matrix.CharValues = append(matrix.CharValues, element)
+			content.CharValues = append(content.CharValues, element)
 			index = checkIndex(index + offset + int(numberOfBytes))
 		}
+		matrix.Content = content
 	case MxDoubleClass:
 		fallthrough
 	case MxSingleClass:
@@ -284,20 +287,22 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	case MxInt32Class:
 		fallthrough
 	case MxUint32Class:
+		var content NumPrt
 		// Real part
 		tmp := data[index:]
 		re, used, _ := extractNumeric(&tmp, order)
-		matrix.RealPart = re
+		content.RealPart = re
 		index += used
 		index = checkIndex(index)
 		// Imaginary part (optional)
 		if complexNumber {
 			tmp = data[index:]
 			im, used, _ := extractNumeric(&tmp, order)
-			matrix.ImaginaryPart = im
+			content.ImaginaryPart = im
 			index += used
 			index = checkIndex(index)
 		}
+		matrix.Content = content
 	default:
 		return MatMatrix{}, 0, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
 	}
