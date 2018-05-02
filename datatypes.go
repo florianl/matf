@@ -141,7 +141,7 @@ func extractTag(data *[]byte, order binary.ByteOrder) (uint32, uint32, int, erro
 	var dataType, numberOfBytes uint32
 	var offset int
 
-	small, err := isSmallDataElementFormat(*data, order)
+	small, err := isSmallDataElementFormat(data, order)
 	if err != nil {
 		return 0, 0, 0, err
 	}

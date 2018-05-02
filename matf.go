@@ -114,7 +114,7 @@ func readDimensions(data interface{}) (Dimensions, error) {
 	return dim, nil
 }
 
-func isSmallDataElementFormat(data []byte, order binary.ByteOrder) (bool, error) {
+func isSmallDataElementFormat(data *[]byte, order binary.ByteOrder) (bool, error) {
 	var offset int
 
 	if order == binary.LittleEndian {
@@ -122,7 +122,7 @@ func isSmallDataElementFormat(data []byte, order binary.ByteOrder) (bool, error)
 	}
 
 	small := make([]byte, 2)
-	buf := bytes.NewReader(data[offset:])
+	buf := bytes.NewReader((*data)[offset:])
 	if err := binary.Read(buf, order, &small); err != nil {
 		return false, fmt.Errorf("Could not read bytes: %v", err)
 	}
