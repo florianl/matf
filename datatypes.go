@@ -51,53 +51,52 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 	var elements []interface{}
 	var err error
 	var step int
+	var i int
 
-	for i := 0; i < numberOfBytes; {
-		switch dataType {
-		case MiMatrix:
-			element, step, err = extractMatrix(*data, order)
-			if err != nil {
-				return nil, err
-			}
-			i += step
-		case MiInt8:
-			element = int8((*data)[i])
-			i++
-		case MiUint8:
-			element = uint8((*data)[i])
-			i++
-		case MiInt16:
-			element = int16(order.Uint16((*data)[i:]))
-			i += 2
-		case MiUint16:
-			element = order.Uint16((*data)[i:])
-			i += 2
-		case MiInt32:
-			element = int32(order.Uint32((*data)[i:]))
-			i += 4
-		case MiUint32:
-			element = order.Uint32((*data)[i:])
-			i += 4
-		case MiInt64:
-			element = int64(order.Uint64((*data)[i:]))
-			i += 8
-		case MiUint64:
-			element = order.Uint64((*data)[i:])
-			i += 8
-		case MiDouble:
-			bits := order.Uint64((*data)[i:])
-			element = math.Float64frombits(bits)
-			i += 8
-		default:
-			return nil, fmt.Errorf("Data Type %d is not supported", dataType)
+	switch dataType {
+	case MiMatrix:
+		tmp := (*data)[i:numberOfBytes]
+		element, step, err = extractMatrix(tmp, order)
+		if err != nil {
+			return nil, err
 		}
-		elements = append(elements, element)
+		i += step
+	case MiInt8:
+		element = int8((*data)[i])
+		i++
+	case MiUint8:
+		element = uint8((*data)[i])
+		i++
+	case MiInt16:
+		element = int16(order.Uint16((*data)[i : i+2]))
+		i += 2
+	case MiUint16:
+		element = order.Uint16((*data)[i : i+2])
+		i += 2
+	case MiInt32:
+		element = int32(order.Uint32((*data)[i : i+4]))
+		i += 4
+	case MiUint32:
+		element = order.Uint32((*data)[i : i+4])
+		i += 4
+	case MiInt64:
+		element = int64(order.Uint64((*data)[i : i+8]))
+		i += 8
+	case MiUint64:
+		element = order.Uint64((*data)[i : i+8])
+		i += 8
+	case MiDouble:
+		bits := order.Uint64((*data)[i : i+8])
+		element = math.Float64frombits(bits)
+		i += 8
+	default:
+		return nil, fmt.Errorf("Data Type %d is not supported", dataType)
 	}
+	elements = append(elements, element)
 	return elements, nil
 }
 
 func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, error) {
-
 	dataType, numberOfBytes, offset, err := extractTag(data, order)
 	if err != nil {
 		return nil, 0, err

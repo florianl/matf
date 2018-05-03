@@ -292,8 +292,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		tmp := data[index:]
 		re, used, _ := extractNumeric(&tmp, order)
 		content.RealPart = re
-		index += used
-		index = checkIndex(index)
+		index = checkIndex(index + used)
 		// Imaginary part (optional)
 		if complexNumber {
 			tmp = data[index:]
