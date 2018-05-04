@@ -79,6 +79,10 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 	case MiUint32:
 		element = order.Uint32((*data)[i : i+4])
 		i += 4
+	case MiSingle:
+		bits := order.Uint32((*data)[i : i+4])
+		element = math.Float32frombits(bits)
+		i += 4
 	case MiInt64:
 		element = int64(order.Uint64((*data)[i : i+8]))
 		i += 8
