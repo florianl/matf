@@ -159,7 +159,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		return MatMatrix{}, 0, err
 	}
 	arrayFlags := make([]byte, int(numberOfBytes))
-	buf = bytes.NewReader(data[index+offset:])
+	buf = bytes.NewReader(data[index+offset : index+offset+int(numberOfBytes)])
 	if err := binary.Read(buf, order, &arrayFlags); err != nil {
 		return MatMatrix{}, 0, err
 	}
@@ -168,17 +168,16 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		complexNumber = true
 	}
 	matrix.Class = matrix.Flags & 0x0F
-	index += (offset + int(numberOfBytes))
-	index = checkIndex(index)
+	index = checkIndex(index + offset + int(numberOfBytes))
 
 	// Dimensions Array
-	tmp := data[index:]
+	tmp := data[index : index+8]
 	dataType, numberOfBytes, offset, err = extractTag(&tmp, order)
 	if err != nil {
 		return MatMatrix{}, 0, err
 	}
 	dimArray := make([]byte, int(numberOfBytes))
-	buf = bytes.NewReader(data[index+offset:])
+	buf = bytes.NewReader(data[index+offset : index+offset+int(numberOfBytes)])
 	if err := binary.Read(buf, order, &dimArray); err != nil {
 		return MatMatrix{}, 0, err
 	}
@@ -187,8 +186,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		return MatMatrix{}, 0, err
 	}
 	matrix.Dimensions, _ = readDimensions(dims)
-	index += (offset + int(numberOfBytes))
-	index = checkIndex(index)
+	index = checkIndex(index + offset + int(numberOfBytes))
+
 	// Array Name
 	tmp = data[index:]
 	arrayName, step, err := extractArrayName(&tmp, order)
@@ -219,7 +218,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		// Field Names
 		numberOfFields := order.Uint32(data[index+12:index+16]) / fieldNameLength
 		index = checkIndex(index + 16)
-		tmp := data[index:]
+		tmp := data[index : index+int(fieldNameLength*numberOfFields)]
 		fieldNames, err := extractFieldNames(&tmp, int(fieldNameLength), int(numberOfFields))
 		if err != nil {
 			return MatMatrix{}, 0, err
@@ -229,9 +228,9 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		// Field Values
 		for ; numberOfFields > 0; numberOfFields-- {
 			var element interface{}
-			tmp := data[index:]
+			tmp := data[index : index+8]
 			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
-			tmp = data[index+offset:]
+			tmp = data[index+offset : index+offset+int(numberOfBytes)]
 			element, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
@@ -243,7 +242,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		matrix.Content = content
 	case MxCharClass:
 		var content CharPrt
-		tmp := data[index:]
+		tmp := data[index : index+8]
 		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
 		tmp = data[index : index+int(offset)+int(numberOfBytes)]
 		name, _, err := extractArrayName(&tmp, order)
@@ -261,9 +260,9 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			if counter > 3 {
 				break
 			}
-			tmp := data[index:]
+			tmp := data[index : index+8]
 			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
-			tmp = data[index+offset:]
+			tmp = data[index+offset : index+offset+int(numberOfBytes)]
 			element, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
