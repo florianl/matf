@@ -45,7 +45,7 @@ const (
 	MxUint64Class int = 15
 )
 
-func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, error) {
+func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, int, error) {
 
 	var element interface{}
 	var elements []interface{}
@@ -53,51 +53,55 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 	var step int
 	var i int
 
-	switch dataType {
-	case MiMatrix:
-		tmp := (*data)[i:numberOfBytes]
-		element, step, err = extractMatrix(tmp, order)
-		if err != nil {
-			return nil, err
+	for i < numberOfBytes {
+		switch dataType {
+		case MiMatrix:
+			tmp := (*data)[i:]
+			element, step, err = extractMatrix(tmp, order)
+			if err != nil {
+				return nil, 0, err
+			}
+			i += step
+			elements = append(elements, element)
+			return elements, i, nil
+		case MiInt8:
+			element = int8((*data)[i])
+			i++
+		case MiUint8:
+			element = uint8((*data)[i])
+			i++
+		case MiInt16:
+			element = int16(order.Uint16((*data)[i : i+2]))
+			i += 2
+		case MiUint16:
+			element = order.Uint16((*data)[i : i+2])
+			i += 2
+		case MiInt32:
+			element = int32(order.Uint32((*data)[i : i+4]))
+			i += 4
+		case MiUint32:
+			element = order.Uint32((*data)[i : i+4])
+			i += 4
+		case MiSingle:
+			bits := order.Uint32((*data)[i : i+4])
+			element = math.Float32frombits(bits)
+			i += 4
+		case MiInt64:
+			element = int64(order.Uint64((*data)[i : i+8]))
+			i += 8
+		case MiUint64:
+			element = order.Uint64((*data)[i : i+8])
+			i += 8
+		case MiDouble:
+			bits := order.Uint64((*data)[i : i+8])
+			element = math.Float64frombits(bits)
+			i += 8
+		default:
+			return nil, 0, fmt.Errorf("Data Type %d is not supported", dataType)
 		}
-		i += step
-	case MiInt8:
-		element = int8((*data)[i])
-		i++
-	case MiUint8:
-		element = uint8((*data)[i])
-		i++
-	case MiInt16:
-		element = int16(order.Uint16((*data)[i : i+2]))
-		i += 2
-	case MiUint16:
-		element = order.Uint16((*data)[i : i+2])
-		i += 2
-	case MiInt32:
-		element = int32(order.Uint32((*data)[i : i+4]))
-		i += 4
-	case MiUint32:
-		element = order.Uint32((*data)[i : i+4])
-		i += 4
-	case MiSingle:
-		bits := order.Uint32((*data)[i : i+4])
-		element = math.Float32frombits(bits)
-		i += 4
-	case MiInt64:
-		element = int64(order.Uint64((*data)[i : i+8]))
-		i += 8
-	case MiUint64:
-		element = order.Uint64((*data)[i : i+8])
-		i += 8
-	case MiDouble:
-		bits := order.Uint64((*data)[i : i+8])
-		element = math.Float64frombits(bits)
-		i += 8
-	default:
-		return nil, fmt.Errorf("Data Type %d is not supported", dataType)
+		elements = append(elements, element)
 	}
-	elements = append(elements, element)
-	return elements, nil
+	return elements, i, nil
 }
 
 func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, error) {
@@ -106,7 +110,7 @@ func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, err
 		return nil, 0, err
 	}
 	tmp := (*data)[offset:]
-	re, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+	re, _, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return nil, 0, err
 	}

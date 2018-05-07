@@ -181,7 +181,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	if err := binary.Read(buf, order, &dimArray); err != nil {
 		return MatMatrix{}, 0, err
 	}
-	dims, err := extractDataElement(&dimArray, order, int(dataType), int(numberOfBytes))
+
+	dims, _, err := extractDataElement(&dimArray, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return MatMatrix{}, 0, err
 	}
@@ -231,7 +232,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			tmp := data[index : index+8]
 			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
 			tmp = data[index+offset : index+offset+int(numberOfBytes)]
-			element, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+			element, _, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
@@ -263,7 +264,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 			tmp := data[index : index+8]
 			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
 			tmp = data[index+offset : index+offset+int(numberOfBytes)]
-			element, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+			element, _, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 			if err != nil {
 				return MatMatrix{}, 0, err
 			}
@@ -314,7 +315,7 @@ func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {
 		return nil, err
 	}
 
-	if count != numberOfBytes {
+	if count != int(numberOfBytes) {
 		return nil, fmt.Errorf("Could not read %d bytes", numberOfBytes)
 	}
 	return data, nil
@@ -334,39 +335,53 @@ func decompressData(data []byte) ([]byte, error) {
 	return out.Bytes(), err
 }
 
-func readDataElementField(m *Matf, order binary.ByteOrder) (int, interface{}, error) {
+func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, error) {
+	var elements []interface{}
 	var element interface{}
 	var data []byte
-	var dataType, numberOfBytes uint32
+	var dataType, completeBytes uint32
+	var offset, i, step int
 	tag, err := readBytes(m, 8)
 	if err != nil {
 		return 0, nil, err
 	}
 
 	dataType = order.Uint32(tag[:4])
-	numberOfBytes = order.Uint32(tag[4:8])
+	completeBytes = order.Uint32(tag[4:8])
 
-	data, err = readBytes(m, int(numberOfBytes))
+	data, err = readBytes(m, int(completeBytes))
 	if err != nil {
 		return 0, nil, err
 	}
 
 	if dataType == uint32(MiCompressed) {
-		plain, err := decompressData(data[:numberOfBytes])
+		plain, err := decompressData(data[:completeBytes])
 		if err != nil {
 			return 0, nil, err
 		}
-		dataType = order.Uint32(plain[:4])
-		numberOfBytes = order.Uint32(plain[4:8])
-		data = plain[8:]
+		dataType, completeBytes, offset, err = extractTag(&plain, order)
+		data = plain[offset:]
 	}
 
-	element, err = extractDataElement(&data, order, int(dataType), int(numberOfBytes))
+	element, i, err = extractDataElement(&data, order, int(dataType), int(completeBytes))
 	if err != nil {
 		return 0, nil, err
 	}
+	elements = append(elements, element)
 
-	return int(dataType), element, nil
+	for uint32(i) < completeBytes {
+		tmp := data[i:]
+		dataType, numberOfBytes, offset, err := extractTag(&tmp, order)
+		tmp = data[i+offset:]
+		element, step, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+		if err != nil {
+			return 0, nil, err
+		}
+		i = checkIndex(i + step + offset)
+		elements = append(elements, element)
+	}
+
+	return int(dataType), elements, nil
 }
 
 // Open a MAT-file
