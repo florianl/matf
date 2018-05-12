@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"reflect"
+
+	"github.com/pkg/errors"
 )
 
 // Flags
@@ -74,7 +76,7 @@ func readHeader(mat *Matf, file *os.File) error {
 	data := make([]byte, 128)
 	count, err := file.Read(data)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "file.Read() in readHeader() failed")
 	}
 
 	if count != 128 {
@@ -316,7 +318,7 @@ func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {
 	}
 
 	if count != int(numberOfBytes) {
-		return nil, fmt.Errorf("Could not read %d bytes", numberOfBytes)
+		return nil, fmt.Errorf("Read %d of %d bytes", count, numberOfBytes)
 	}
 	return data, nil
 }
@@ -327,7 +329,7 @@ func decompressData(data []byte) ([]byte, error) {
 	r, err := zlib.NewReader(tmp)
 	defer r.Close()
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, errors.Wrap(err, "zlib.NewReader() in decompressData() failed")
 	}
 	if r != nil && err == nil {
 		io.Copy(&out, r)
@@ -343,7 +345,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 	var offset, i, step int
 	tag, err := readBytes(m, 8)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, errors.Wrap(err, "readBytes() in readDataElementField() failed")
 	}
 
 	dataType = order.Uint32(tag[:4])
@@ -351,13 +353,13 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 
 	data, err = readBytes(m, int(completeBytes))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, errors.Wrap(err, "readBytes() in readDataElementField() failed")
 	}
 
 	if dataType == uint32(MiCompressed) {
 		plain, err := decompressData(data[:completeBytes])
 		if err != nil {
-			return 0, nil, err
+			return 0, nil, errors.Wrap(err, "decompressData() in readDataElementField() failed")
 		}
 		dataType, completeBytes, offset, err = extractTag(&plain, order)
 		data = plain[offset:]
@@ -365,7 +367,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 
 	element, i, err = extractDataElement(&data, order, int(dataType), int(completeBytes))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
 	}
 	elements = append(elements, element)
 
@@ -375,7 +377,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 		tmp = data[i+offset:]
 		element, step, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 		if err != nil {
-			return 0, nil, err
+			return 0, nil, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
 		}
 		i = checkIndex(i + step + offset)
 		elements = append(elements, element)
@@ -388,7 +390,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 func Open(file string) (*Matf, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "os.Open() in Open() failed")
 	}
 
 	mat := new(Matf)
@@ -396,7 +398,7 @@ func Open(file string) (*Matf, error) {
 
 	err = readHeader(mat, f)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "readHeader() in Open() failed")
 	}
 
 	return mat, nil

@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+
+	"github.com/pkg/errors"
 )
 
 // MAT-File Data Types
@@ -59,7 +61,7 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 			tmp := (*data)[i:]
 			element, step, err = extractMatrix(tmp, order)
 			if err != nil {
-				return nil, 0, err
+				return nil, 0, errors.Wrap(err, "extractMatrix() in extractDataElement() failed")
 			}
 			i += step
 			elements = append(elements, element)
@@ -107,12 +109,12 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, error) {
 	dataType, numberOfBytes, offset, err := extractTag(data, order)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.Wrap(err, "extractTag() in extractNumeric() failed")
 	}
 	tmp := (*data)[offset:]
 	re, _, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errors.Wrap(err, "extractDataElement() in extractNumeric() failed")
 	}
 	return re, offset + int(numberOfBytes), err
 }
@@ -131,7 +133,7 @@ func extractFieldNames(data *[]byte, fieldNameLength, numberOfFields int) ([]str
 func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error) {
 	_, numberOfBytes, offset, err := extractTag(data, order)
 	if err != nil {
-		return "", 0, err
+		return "", 0, errors.Wrap(err, "extractTag() in extractArrayName() failed")
 	}
 	if numberOfBytes == 0 {
 		return "", offset, nil
@@ -139,7 +141,7 @@ func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error)
 	arrayName := make([]byte, int(numberOfBytes))
 	buf := bytes.NewReader((*data)[offset:])
 	if err := binary.Read(buf, order, &arrayName); err != nil {
-		return "", 0, err
+		return "", 0, errors.Wrap(err, "binary.Read() in extractArrayName() failed")
 	}
 	return string(arrayName), offset + int(numberOfBytes), nil
 }
@@ -150,7 +152,7 @@ func extractTag(data *[]byte, order binary.ByteOrder) (uint32, uint32, int, erro
 
 	small, err := isSmallDataElementFormat(data, order)
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, 0, 0, errors.Wrap(err, "isSmallDataElementFormat() in extractTag() failed")
 	}
 	if small {
 		dataType = uint32(order.Uint16((*data)[0:2]))
