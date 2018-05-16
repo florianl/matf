@@ -126,3 +126,31 @@ func TestOpen(t *testing.T) {
 		})
 	}
 }
+
+func TestDecompressData(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		input  []byte
+		output []byte
+		err    string
+	}{
+		{name: "DeadCell", input: []byte{0x78, 0x9c, 0xba, 0xb7, 0xf6, 0x9c, 0x20, 0x20, 0x00, 0x00, 0xff, 0xff, 0x07, 0x30, 0x02, 0x6b}, output: []byte{0xDE, 0xAD, 0xCE, 0x11}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := decompressData(tc.input)
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				}
+				return
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			fmt.Printf("Expected: %#v\tGot: %#v\n", tc.output, output)
+		})
+	}
+}
