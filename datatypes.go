@@ -64,8 +64,7 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 				return nil, 0, errors.Wrap(err, "extractMatrix() in extractDataElement() failed")
 			}
 			i += step
-			elements = append(elements, element)
-			return elements, i, nil
+			return element, i, nil
 		case MiInt8:
 			element = int8((*data)[i])
 			i++

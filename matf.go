@@ -27,8 +27,8 @@ type Matf struct {
 	byteSwapping bool
 }
 
-// Dimensions contains the sizes of a MatMatrix
-type Dimensions struct {
+// Dim contains the dimensions of a MatMatrix
+type Dim struct {
 	X, Y, Z int
 }
 
@@ -60,7 +60,7 @@ type MatMatrix struct {
 	Name  string
 	Flags uint32
 	Class uint32
-	Dimensions
+	Dim
 	Content interface{}
 }
 
@@ -96,8 +96,8 @@ func readHeader(mat *Matf, file *os.File) error {
 	return nil
 }
 
-func readDimensions(data interface{}) (Dimensions, error) {
-	var dim Dimensions
+func readDimensions(data interface{}) (Dim, error) {
+	var dim Dim
 	t := reflect.ValueOf(data)
 
 	for i := 0; i < t.Len(); i++ {
@@ -110,7 +110,7 @@ func readDimensions(data interface{}) (Dimensions, error) {
 		case 2:
 			dim.Z = int(value)
 		default:
-			return Dimensions{}, fmt.Errorf("More dimensions than exptected")
+			return Dim{}, fmt.Errorf("More dimensions than exptected")
 		}
 	}
 	return dim, nil
@@ -188,7 +188,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	if err != nil {
 		return MatMatrix{}, 0, err
 	}
-	matrix.Dimensions, _ = readDimensions(dims)
+	matrix.Dim, _ = readDimensions(dims)
 	index = checkIndex(index + offset + int(numberOfBytes))
 
 	// Array Name
@@ -337,7 +337,8 @@ func decompressData(data []byte) ([]byte, error) {
 	return out.Bytes(), err
 }
 
-func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, error) {
+func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
+	var mat MatMatrix
 	var elements []interface{}
 	var element interface{}
 	var data []byte
@@ -345,7 +346,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 	var offset, i, step int
 	tag, err := readBytes(m, 8)
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "readBytes() in readDataElementField() failed")
+		return MatMatrix{}, errors.Wrap(err, "readBytes() in readDataElementField() failed")
 	}
 
 	dataType = order.Uint32(tag[:4])
@@ -353,13 +354,13 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 
 	data, err = readBytes(m, int(completeBytes))
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "readBytes() in readDataElementField() failed")
+		return MatMatrix{}, errors.Wrap(err, "readBytes() in readDataElementField() failed")
 	}
 
 	if dataType == uint32(MiCompressed) {
 		plain, err := decompressData(data[:completeBytes])
 		if err != nil {
-			return 0, nil, errors.Wrap(err, "decompressData() in readDataElementField() failed")
+			return MatMatrix{}, errors.Wrap(err, "decompressData() in readDataElementField() failed")
 		}
 		dataType, completeBytes, offset, err = extractTag(&plain, order)
 		data = plain[offset:]
@@ -367,9 +368,11 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 
 	element, i, err = extractDataElement(&data, order, int(dataType), int(completeBytes))
 	if err != nil {
-		return 0, nil, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
+		return MatMatrix{}, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
 	}
-	elements = append(elements, element)
+	if int(dataType) == MiMatrix {
+		mat = element.(MatMatrix)
+	}
 
 	for uint32(i) < completeBytes {
 		tmp := data[i:]
@@ -377,13 +380,18 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (int, []interface{}, 
 		tmp = data[i+offset:]
 		element, step, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
 		if err != nil {
-			return 0, nil, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
+			return MatMatrix{}, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
 		}
 		i = checkIndex(i + step + offset)
 		elements = append(elements, element)
 	}
 
-	return int(dataType), elements, nil
+	return mat, nil
+}
+
+// Dimensions returns the dimensions of a matrix
+func (m MatMatrix) Dimensions() (int, int, int, error) {
+	return m.Dim.X, m.Dim.Y, m.Dim.Z, nil
 }
 
 // Open a MAT-file
@@ -405,7 +413,7 @@ func Open(file string) (*Matf, error) {
 }
 
 // ReadDataElement returns the next data element
-func ReadDataElement(file *Matf) (int, interface{}, error) {
+func ReadDataElement(file *Matf) (MatMatrix, error) {
 	if file.byteSwapping == true {
 		return readDataElementField(file, binary.LittleEndian)
 	}
