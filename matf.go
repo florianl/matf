@@ -160,12 +160,16 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	if err != nil {
 		return MatMatrix{}, 0, err
 	}
+	if numberOfBytes != 8 {
+		// The size of the Array Flags subelement is always 2 * miUINT32
+		return MatMatrix{}, 0, fmt.Errorf("Expected Array Flags field lengt of 8 got %d", numberOfBytes)
+	}
 	arrayFlags := make([]byte, int(numberOfBytes))
 	buf = bytes.NewReader(data[index+offset : index+offset+int(numberOfBytes)])
 	if err := binary.Read(buf, order, &arrayFlags); err != nil {
 		return MatMatrix{}, 0, err
 	}
-	matrix.Flags = binary.LittleEndian.Uint32(arrayFlags)
+	matrix.Flags = order.Uint32(arrayFlags)
 	if FlagComplex&matrix.Flags == FlagComplex {
 		complexNumber = true
 	}
