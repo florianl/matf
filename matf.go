@@ -233,7 +233,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		content.FieldNames = fieldNames
 		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
 		// Field Values
-		for ; numberOfFields > 0; numberOfFields-- {
+		toExtract := (matrix.Dim.Y * int(numberOfFields))
+		for ; toExtract > 0; toExtract-- {
 			var element interface{}
 			tmp := data[index : index+8]
 			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
@@ -343,11 +344,10 @@ func decompressData(data []byte) ([]byte, error) {
 
 func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 	var mat MatMatrix
-	var elements []interface{}
 	var element interface{}
 	var data []byte
 	var dataType, completeBytes uint32
-	var offset, i, step int
+	var offset, i int
 	tag, err := readBytes(m, 8)
 	if err != nil {
 		return MatMatrix{}, errors.Wrap(err, "readBytes() in readDataElementField() failed")
@@ -379,15 +379,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 	}
 
 	for uint32(i) < completeBytes {
-		tmp := data[i:]
-		dataType, numberOfBytes, offset, err := extractTag(&tmp, order)
-		tmp = data[i+offset:]
-		element, step, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-		if err != nil {
-			return MatMatrix{}, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
-		}
-		i = checkIndex(i + step + offset)
-		elements = append(elements, element)
+		return mat, fmt.Errorf("readDataElementField() could not extract all information")
 	}
 
 	return mat, nil
