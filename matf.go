@@ -350,7 +350,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 	var offset, i int
 	tag, err := readBytes(m, 8)
 	if err != nil {
-		return MatMatrix{}, errors.Wrap(err, "readBytes() in readDataElementField() failed")
+		return MatMatrix{}, err
 	}
 
 	dataType = order.Uint32(tag[:4])
