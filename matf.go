@@ -12,12 +12,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Flags
+// Basic binary flags for various array types
 const (
-	ClassMask   = 0x0F
-	FlagComplex = 1 << 11
-	FlagGlobal  = 1 << 10
-	FlagLogical = 1 << 9
+	ClassMask   = 0x0F    // Mask to extract the containing class from an array.
+	FlagComplex = 1 << 11 // If set, the data element contains an imaginary part.
+	FlagGlobal  = 1 << 10 // MATLAB uses this element on global scope.
+	FlagLogical = 1 << 9  // Array is used for logical indexing.
 )
 
 // Matf represents the MAT-file
@@ -61,15 +61,15 @@ type MatMatrix struct {
 	Flags uint32
 	Class uint32
 	Dim
-	Content interface{}
+	Content interface{} // Can contain NumPrt, StructPrt, CellPrt or CharPrt - depending on the value in Class.
 }
 
 // Header contains informations about the MAT-file
 type Header struct {
-	Text                string // 0 - 116
-	subsystemDataOffset []byte // 117 - 124
-	Version             uint16 // 125 - 126
-	endianIndicator     uint16 // 127 - 128
+	Text                string // Some kind of descriptive text containing various information.
+	SubsystemDataOffset []byte // Contains the sybsystem-specific data.
+	Version             uint16 // MATLAB version used, to create this file.
+	EndianIndicator     uint16 // Indicates, if the file was written on a Big Endian or Little Endian system.
 }
 
 func readHeader(mat *Matf, file *os.File) error {
@@ -84,11 +84,11 @@ func readHeader(mat *Matf, file *os.File) error {
 	}
 
 	mat.Header.Text = string(data[:116])
-	mat.Header.subsystemDataOffset = data[116:124]
+	mat.Header.SubsystemDataOffset = data[116:124]
 	mat.Header.Version = binary.BigEndian.Uint16(data[124:126])
-	mat.Header.endianIndicator = binary.BigEndian.Uint16(data[126:128])
+	mat.Header.EndianIndicator = binary.BigEndian.Uint16(data[126:128])
 
-	if mat.Header.endianIndicator == binary.BigEndian.Uint16([]byte{0x49, 0x4d}) {
+	if mat.Header.EndianIndicator == binary.BigEndian.Uint16([]byte{0x49, 0x4d}) {
 		// EndianIndicator is IM rather than MI
 		mat.byteSwapping = true
 	}
@@ -390,11 +390,11 @@ func (m MatMatrix) Dimensions() (int, int, int, error) {
 	return m.Dim.X, m.Dim.Y, m.Dim.Z, nil
 }
 
-// Open a MAT-file
+// Open a MAT-file and extracts the header information into the Header struct.
 func Open(file string) (*Matf, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return nil, errors.Wrap(err, "os.Open() in Open() failed")
+		return nil, err
 	}
 
 	mat := new(Matf)
@@ -408,7 +408,8 @@ func Open(file string) (*Matf, error) {
 	return mat, nil
 }
 
-// ReadDataElement returns the next data element
+// ReadDataElement returns the next data element.
+// It returns io.EOF, if no further elements are available
 func ReadDataElement(file *Matf) (MatMatrix, error) {
 	if file.byteSwapping == true {
 		return readDataElementField(file, binary.LittleEndian)

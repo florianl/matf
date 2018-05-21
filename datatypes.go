@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MAT-File Data Types
+// List of all MAT-File Data Types
 const (
 	MiInt8       int = 1
 	MiUint8      int = 2
@@ -28,7 +28,7 @@ const (
 	MiUtf32      int = 18
 )
 
-// MAT-File Array Types
+// List of all MAT-File Array Types
 const (
 	MxCellClass   int = 1
 	MxStructClass int = 2
