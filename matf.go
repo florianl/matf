@@ -259,13 +259,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		}
 		content.CharName = name
 		index = checkIndex(index + int(offset) + int(numberOfBytes))
-		var counter int
 		for {
 			if index >= maxLen {
-				break
-			}
-			counter++
-			if counter > 3 {
 				break
 			}
 			tmp := data[index : index+8]
