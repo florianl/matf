@@ -154,3 +154,41 @@ func TestDecompressData(t *testing.T) {
 		})
 	}
 }
+
+func TestDimensions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		mat  MatMatrix
+		x    int
+		y    int
+		z    int
+		err  string
+	}{
+		{name: "1 Dim", mat: MatMatrix{Dim: Dim{X: 2, Y: 0, Z: 0}}, x: 2},
+		{name: "2 Dim", mat: MatMatrix{Dim: Dim{X: 3, Y: 5, Z: 0}}, x: 3, y: 5},
+		{name: "3 Dim", mat: MatMatrix{Dim: Dim{X: 7, Y: 11, Z: 13}}, x: 7, y: 11, z: 13},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			x, y, z, err := tc.mat.Dimensions()
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				}
+				return
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			if tc.x != x {
+				t.Fatalf("Expected x: %d\tgot: %d", tc.x, x)
+			} else if tc.y != y {
+				t.Fatalf("Expected y: %d\tgot: %d", tc.y, y)
+			} else if tc.z != z {
+				t.Fatalf("Expected z: %d\tgot: %d", tc.x, z)
+			}
+		})
+	}
+}
