@@ -387,6 +387,10 @@ func (m MatMatrix) Dimensions() (int, int, int, error) {
 
 // Open a MAT-file and extracts the header information into the Header struct.
 func Open(file string) (*Matf, error) {
+	if info, err := os.Stat(file); err == nil && info.IsDir() {
+		return nil, fmt.Errorf("%s is not a file", file)
+	}
+
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err

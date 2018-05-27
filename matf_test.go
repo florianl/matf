@@ -119,6 +119,12 @@ func TestOpen(t *testing.T) {
 	}
 	defer headerOnlyMI.Close()
 
+	testdir, ferr := ioutil.TempDir(tdir, "TestDir")
+	if ferr != nil {
+		t.Fatal(ferr)
+	}
+	defer os.RemoveAll(testdir)
+
 	tests := []struct {
 		name string
 		in   string
@@ -129,6 +135,7 @@ func TestOpen(t *testing.T) {
 		{name: "No Matf", in: notValid.Name(), err: "Could not read enough bytes"},
 		{name: "Header Only", in: headerOnly.Name()},
 		{name: "Header Only MI", in: headerOnlyMI.Name()},
+		{name: "Folder As Input", in: testdir, err: "is not a file"},
 	}
 
 	for _, tc := range tests {
@@ -137,7 +144,10 @@ func TestOpen(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
@@ -163,8 +173,10 @@ func TestDecompressData(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
-				return
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
@@ -195,8 +207,10 @@ func TestDimensions(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
-				return
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
