@@ -56,8 +56,10 @@ func TestExtractDataElement(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
-				return
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
@@ -91,8 +93,10 @@ func TestExtractNumeric(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
-				return
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
@@ -124,8 +128,10 @@ func TestExtractFieldNames(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
-				return
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
@@ -158,8 +164,10 @@ func TestExtractArrayName(t *testing.T) {
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
 				}
-				return
+				t.Fatalf("Expected no error, got: %v", err)
 			} else if len(tc.err) != 0 {
 				t.Fatalf("Expected error, got none")
 			}
