@@ -198,6 +198,9 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	// Array Name
 	tmp = data[index:]
 	arrayName, step, err := extractArrayName(&tmp, order)
+	if err != nil {
+		return MatMatrix{}, 0, err
+	}
 	matrix.Name = arrayName
 	index = checkIndex(index + step)
 
@@ -312,13 +315,20 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 
 func readBytes(m *Matf, numberOfBytes int) ([]byte, error) {
 	data := make([]byte, numberOfBytes)
-	count, err := m.file.Read(data)
-	if err != nil {
-		return nil, err
-	}
+	var index int
 
-	if count != int(numberOfBytes) {
-		return nil, fmt.Errorf("Read %d of %d bytes", count, numberOfBytes)
+	for {
+		count, err := m.file.Read(data[index:])
+		if err != nil {
+			return nil, err
+		}
+		index += count
+		if index >= numberOfBytes || count == 0 {
+			break
+		}
+	}
+	if index != numberOfBytes {
+		return nil, fmt.Errorf("Read %d of %d bytes", index, numberOfBytes)
 	}
 	return data, nil
 }
@@ -350,7 +360,6 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 
 	dataType = order.Uint32(tag[:4])
 	completeBytes = order.Uint32(tag[4:8])
-
 	data, err = readBytes(m, int(completeBytes))
 	if err != nil {
 		return MatMatrix{}, errors.Wrap(err, "readBytes() in readDataElementField() failed")
@@ -362,6 +371,9 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 			return MatMatrix{}, errors.Wrap(err, "decompressData() in readDataElementField() failed")
 		}
 		dataType, completeBytes, offset, err = extractTag(&plain, order)
+		if err != nil {
+			return MatMatrix{}, errors.Wrap(err, "extractTag() in readDataElementField() failed")
+		}
 		data = plain[offset:]
 	}
 
