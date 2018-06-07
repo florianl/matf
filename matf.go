@@ -41,7 +41,7 @@ type NumPrt struct {
 // StructPrt represents a matf struct
 type StructPrt struct {
 	FieldNames  []string
-	FieldValues []interface{}
+	FieldValues map[string][]interface{}
 }
 
 // CellPrt represents a list of matf cells
@@ -221,7 +221,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		}
 		matrix.Content = content
 	case MxStructClass:
-		var elements []interface{}
+		var elements = make(map[string][]interface{})
 		var content StructPrt
 		// Field Name Length
 		fieldNameLength := order.Uint32(data[index+4 : index+8])
@@ -237,6 +237,7 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
 		// Field Values
 		toExtract := (matrix.Dim.Y * int(numberOfFields))
+		var i int
 		for ; toExtract > 0; toExtract-- {
 			var element interface{}
 			tmp := data[index : index+8]
@@ -247,7 +248,8 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 				return MatMatrix{}, 0, err
 			}
 			index = checkIndex(index + offset + int(numberOfBytes))
-			elements = append(elements, element)
+			elements[fieldNames[i]] = append(elements[fieldNames[i]], element)
+			i = (i + 1) % int(numberOfFields)
 		}
 		content.FieldValues = elements
 		matrix.Content = content
