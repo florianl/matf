@@ -1,6 +1,7 @@
 package matf
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -257,6 +258,37 @@ func TestDimensions(t *testing.T) {
 			} else if tc.z != z {
 				t.Fatalf("Expected z: %d\tgot: %d", tc.x, z)
 			}
+		})
+	}
+}
+
+func TestExtractMatrix(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		mat  MatMatrix
+		err  string
+	}{
+		{name: "notExpectedArrayFlagSize", data: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, err: "Expected Array Flags field lengt of 8 got"},
+		{name: "invalidSmallTag", data: []byte{0x00, 0x01, 0x02, 0x03}, err: "Expected Array Flags field lengt of 8 got"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mat, index, err := extractMatrix(tc.data, binary.LittleEndian)
+			fmt.Println(err)
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
+				}
+				t.Fatalf("Expected no error, got: %v", err)
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			_ = mat
+			_ = index
 		})
 	}
 }
