@@ -339,11 +339,11 @@ func decompressData(data []byte) ([]byte, error) {
 	tmp := bytes.NewReader(data)
 	var out bytes.Buffer
 	r, err := zlib.NewReader(tmp)
-	defer r.Close()
 	if err != nil {
 		return []byte{}, errors.Wrap(err, "zlib.NewReader() in decompressData() failed")
 	}
-	if r != nil && err == nil {
+	defer r.Close()
+	if r != nil {
 		io.Copy(&out, r)
 	}
 	return out.Bytes(), err
@@ -424,7 +424,7 @@ func Open(file string) (*Matf, error) {
 // ReadDataElement returns the next data element.
 // It returns io.EOF, if no further elements are available
 func ReadDataElement(file *Matf) (MatMatrix, error) {
-	if file.byteSwapping == true {
+	if file.byteSwapping {
 		return readDataElementField(file, binary.LittleEndian)
 	}
 	return readDataElementField(file, binary.BigEndian)

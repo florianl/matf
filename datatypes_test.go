@@ -220,7 +220,7 @@ func TestExtractDataElement(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ele, step, err := extractDataElement(tc.data, tc.order, tc.dataType, tc.numberOfBytes)
 			if err != nil {
-				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
 				} else {
 					return
@@ -257,7 +257,7 @@ func TestExtractNumeric(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ele, step, err := extractNumeric(tc.data, tc.order)
 			if err != nil {
-				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
 				} else {
 					return
@@ -292,7 +292,7 @@ func TestExtractFieldNames(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			fields, err := extractFieldNames(tc.data, tc.fieldNameLength, tc.numberOfFields)
 			if err != nil {
-				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
 				} else {
 					return
@@ -328,7 +328,7 @@ func TestExtractArrayName(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			name, step, err := extractArrayName(tc.data, tc.order)
 			if err != nil {
-				if matched, _ := regexp.MatchString(tc.err, err.Error()); matched == false {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
 					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
 				} else {
 					return
