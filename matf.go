@@ -144,13 +144,127 @@ func checkIndex(index int) int {
 	}
 }
 
+func extractClass(mat *MatMatrix, maxIndex int, data *[]byte, order binary.ByteOrder) (int, error) {
+	var index int
+
+	switch int(mat.Class) {
+	case MxCellClass:
+		var content CellPrt
+		for {
+			if index >= maxIndex {
+				break
+			}
+			tmp := (*data)[index+8:]
+			element, step, err := extractMatrix(tmp, order)
+			if err != nil {
+				return 0, err
+			}
+			content.Cells = append(content.Cells, element)
+			index = checkIndex(index + 8 + step)
+		}
+		mat.Content = content
+	case MxStructClass:
+		var elements = make(map[string][]interface{})
+		var content StructPrt
+		// Field Name Length
+		fieldNameLength := order.Uint32((*data)[index+4 : index+8])
+		// Field Names
+		numberOfFields := order.Uint32((*data)[index+12:index+16]) / fieldNameLength
+		index = checkIndex(index + 16)
+		tmp := (*data)[index : index+int(fieldNameLength*numberOfFields)]
+		fieldNames, err := extractFieldNames(&tmp, int(fieldNameLength), int(numberOfFields))
+		if err != nil {
+			return 0, err
+		}
+		content.FieldNames = fieldNames
+		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
+		// Field Values
+		toExtract := (mat.Dim.Y * int(numberOfFields))
+		var i int
+		for ; toExtract > 0; toExtract-- {
+			var element interface{}
+			tmp := (*data)[index : index+8]
+			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
+			tmp = (*data)[index+offset : index+offset+int(numberOfBytes)]
+			element, _, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+			if err != nil {
+				return 0, err
+			}
+			index = checkIndex(index + offset + int(numberOfBytes))
+			elements[fieldNames[i]] = append(elements[fieldNames[i]], element)
+			i = (i + 1) % int(numberOfFields)
+		}
+		content.FieldValues = elements
+		mat.Content = content
+	case MxCharClass:
+		var content CharPrt
+		tmp := (*data)[index : index+8]
+		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
+		tmp = (*data)[index : index+int(offset)+int(numberOfBytes)]
+		name, _, err := extractArrayName(&tmp, order)
+		if err != nil {
+			return 0, err
+		}
+		content.CharName = name
+		index = checkIndex(index + int(offset) + int(numberOfBytes))
+		for {
+			if index >= maxIndex {
+				break
+			}
+			tmp := (*data)[index : index+8]
+			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
+			tmp = (*data)[index+offset : index+offset+int(numberOfBytes)]
+			element, _, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+			if err != nil {
+				return 0, err
+			}
+			content.CharValues = append(content.CharValues, element)
+			index = checkIndex(index + offset + int(numberOfBytes))
+		}
+		mat.Content = content
+	case MxDoubleClass:
+		fallthrough
+	case MxSingleClass:
+		fallthrough
+	case MxInt8Class:
+		fallthrough
+	case MxUint8Class:
+		fallthrough
+	case MxInt16Class:
+		fallthrough
+	case MxUint16Class:
+		fallthrough
+	case MxInt32Class:
+		fallthrough
+	case MxUint32Class:
+		var content NumPrt
+		// Real part
+		tmp := (*data)[index:]
+		re, used, _ := extractNumeric(&tmp, order)
+		content.RealPart = re
+		index = checkIndex(index + used)
+		// Imaginary part (optional)
+		if FlagComplex&mat.Flags == FlagComplex {
+			tmp = (*data)[index:]
+			im, used, _ := extractNumeric(&tmp, order)
+			content.ImaginaryPart = im
+			index += used
+			index = checkIndex(index)
+		}
+		mat.Content = content
+	default:
+		return 0, fmt.Errorf("This type of class is not supported yet: %d", mat.Class)
+	}
+
+	return index, nil
+}
+
 func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) {
 	var matrix MatMatrix
 	var index int
 	var offset int
 	var dataType uint32
 	var numberOfBytes uint32
-	var complexNumber bool
 	var err error
 	var buf *bytes.Reader
 	var maxLen = len(data)
@@ -170,9 +284,6 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 		return MatMatrix{}, 0, err
 	}
 	matrix.Flags = order.Uint32(arrayFlags)
-	if FlagComplex&matrix.Flags == FlagComplex {
-		complexNumber = true
-	}
 	matrix.Class = matrix.Flags & 0x0F
 	index = checkIndex(index + offset + int(numberOfBytes))
 
@@ -204,114 +315,13 @@ func extractMatrix(data []byte, order binary.ByteOrder) (MatMatrix, int, error) 
 	matrix.Name = arrayName
 	index = checkIndex(index + step)
 
-	switch int(matrix.Class) {
-	case MxCellClass:
-		var content CellPrt
-		for {
-			if index >= maxLen {
-				break
-			}
-			tmp := data[index+8:]
-			element, step, err := extractMatrix(tmp, order)
-			if err != nil {
-				return MatMatrix{}, 0, err
-			}
-			content.Cells = append(content.Cells, element)
-			index = checkIndex(index + 8 + step)
-		}
-		matrix.Content = content
-	case MxStructClass:
-		var elements = make(map[string][]interface{})
-		var content StructPrt
-		// Field Name Length
-		fieldNameLength := order.Uint32(data[index+4 : index+8])
-		// Field Names
-		numberOfFields := order.Uint32(data[index+12:index+16]) / fieldNameLength
-		index = checkIndex(index + 16)
-		tmp := data[index : index+int(fieldNameLength*numberOfFields)]
-		fieldNames, err := extractFieldNames(&tmp, int(fieldNameLength), int(numberOfFields))
-		if err != nil {
-			return MatMatrix{}, 0, err
-		}
-		content.FieldNames = fieldNames
-		index = checkIndex(index + (int(numberOfFields) * int(fieldNameLength)))
-		// Field Values
-		toExtract := (matrix.Dim.Y * int(numberOfFields))
-		var i int
-		for ; toExtract > 0; toExtract-- {
-			var element interface{}
-			tmp := data[index : index+8]
-			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
-			tmp = data[index+offset : index+offset+int(numberOfBytes)]
-			element, _, err = extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-			if err != nil {
-				return MatMatrix{}, 0, err
-			}
-			index = checkIndex(index + offset + int(numberOfBytes))
-			elements[fieldNames[i]] = append(elements[fieldNames[i]], element)
-			i = (i + 1) % int(numberOfFields)
-		}
-		content.FieldValues = elements
-		matrix.Content = content
-	case MxCharClass:
-		var content CharPrt
-		tmp := data[index : index+8]
-		_, numberOfBytes, offset, _ := extractTag(&tmp, order)
-		tmp = data[index : index+int(offset)+int(numberOfBytes)]
-		name, _, err := extractArrayName(&tmp, order)
-		if err != nil {
-			return MatMatrix{}, 0, err
-		}
-		content.CharName = name
-		index = checkIndex(index + int(offset) + int(numberOfBytes))
-		for {
-			if index >= maxLen {
-				break
-			}
-			tmp := data[index : index+8]
-			dataType, numberOfBytes, offset, _ := extractTag(&tmp, order)
-			tmp = data[index+offset : index+offset+int(numberOfBytes)]
-			element, _, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
-			if err != nil {
-				return MatMatrix{}, 0, err
-			}
-			content.CharValues = append(content.CharValues, element)
-			index = checkIndex(index + offset + int(numberOfBytes))
-		}
-		matrix.Content = content
-	case MxDoubleClass:
-		fallthrough
-	case MxSingleClass:
-		fallthrough
-	case MxInt8Class:
-		fallthrough
-	case MxUint8Class:
-		fallthrough
-	case MxInt16Class:
-		fallthrough
-	case MxUint16Class:
-		fallthrough
-	case MxInt32Class:
-		fallthrough
-	case MxUint32Class:
-		var content NumPrt
-		// Real part
-		tmp := data[index:]
-		re, used, _ := extractNumeric(&tmp, order)
-		content.RealPart = re
-		index = checkIndex(index + used)
-		// Imaginary part (optional)
-		if complexNumber {
-			tmp = data[index:]
-			im, used, _ := extractNumeric(&tmp, order)
-			content.ImaginaryPart = im
-			index += used
-			index = checkIndex(index)
-		}
-		matrix.Content = content
-	default:
-		return MatMatrix{}, 0, fmt.Errorf("This type of class is not supported yet: %d", matrix.Class)
+	tmp = data[index:]
+	steps, err := extractClass(&matrix, maxLen-index, &tmp, order)
+	if err != nil {
+		return MatMatrix{}, 0, err
 	}
+	index = checkIndex(index + steps)
+
 	return matrix, index, nil
 }
 
