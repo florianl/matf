@@ -262,6 +262,35 @@ func TestExtractMatrix(t *testing.T) {
 	}
 }
 
+func TestReadDimensions(t *testing.T) {
+	tests := []struct {
+		name string
+		data []interface{}
+		err  string
+	}{
+		{name: " 1", data: []interface{}{1, 1}},
+		{name: " 2", data: []interface{}{2, 1, 2}},
+		{name: " 3", data: []interface{}{3, 1, 2, 3}, err: "More dimensions than exptected"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dim, err := readDimensions(tc.data)
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
+				}
+				t.Fatalf("Expected no error, got: %v", err)
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			_ = dim
+		})
+	}
+}
+
 func TestMatf(t *testing.T) {
 	tdir, ferr := ioutil.TempDir("", "TestMatf")
 	if ferr != nil {
