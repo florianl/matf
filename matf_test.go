@@ -135,7 +135,6 @@ func TestOpen(t *testing.T) {
 		name string
 		in   string
 		err  string
-		mat  *Matf
 	}{
 		{name: "Empty Input", in: "", err: "no such file or directory"},
 		{name: "No Matf", in: notValid.Name(), err: "Could not read enough bytes"},
@@ -235,7 +234,6 @@ func TestExtractMatrix(t *testing.T) {
 	tests := []struct {
 		name string
 		data []byte
-		mat  MatMatrix
 		err  string
 	}{
 		{name: "notExpectedArrayFlagSize", data: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, err: "Expected Array Flags field lengt of 8 got"},
