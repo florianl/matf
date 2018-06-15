@@ -1,11 +1,13 @@
 package matf
 
 import (
+	"bufio"
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"reflect"
 
@@ -369,6 +371,23 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 		}
 		data = plain[offset:]
 	}
+
+	tmpfile, err := ioutil.TempFile("", "matf")
+	if err != nil {
+		return MatMatrix{}, errors.Wrap(err, "ioutil.TempFile() in readDataElementField() failed")
+	}
+
+	defer func() {
+		tmpfile.Close()
+		os.Remove(tmpfile.Name())
+	}()
+
+	if _, err := tmpfile.Write(data); err != nil {
+		return MatMatrix{}, errors.Wrap(err, "os.Write() in readDataElementField() failed")
+	}
+	tmpfile.Seek(0, 0)
+	r := bufio.NewReader(tmpfile)
+	_ = r
 
 	element, i, err = extractDataElement(&data, order, int(dataType), int(completeBytes))
 	if err != nil {

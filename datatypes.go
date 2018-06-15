@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 
 	"github.com/pkg/errors"
@@ -183,4 +184,14 @@ func extractTag(data *[]byte, order binary.ByteOrder) (uint32, uint32, int, erro
 	}
 
 	return dataType, numberOfBytes, offset, nil
+}
+
+func readMatfBytes(r io.Reader, order binary.ByteOrder, numberOfBytes int) (*[]byte, error) {
+	data := make([]byte, numberOfBytes)
+	err := binary.Read(r, order, &data)
+	if err != nil {
+		fmt.Println("error", err)
+		return nil, err
+	}
+	return &data, nil
 }
