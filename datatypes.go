@@ -145,6 +145,25 @@ func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error)
 	return string(arrayName), offset + int(numberOfBytes), nil
 }
 
+func isSmallDataElementFormat(data *[]byte, order binary.ByteOrder) (bool, error) {
+	var offset int
+
+	if order == binary.LittleEndian {
+		offset = 2
+	}
+
+	small := make([]byte, 2)
+	buf := bytes.NewReader((*data)[offset:])
+	if err := binary.Read(buf, order, &small); err != nil {
+		return false, fmt.Errorf("Could not read bytes: %v", err)
+	}
+	if small[0] != small[1] {
+		// Small Data Element Format
+		return true, nil
+	}
+	return false, nil
+}
+
 func extractTag(data *[]byte, order binary.ByteOrder) (uint32, uint32, int, error) {
 	var dataType, numberOfBytes uint32
 	var offset int
