@@ -1,7 +1,6 @@
 package matf
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -48,54 +47,57 @@ const (
 	MxUint64Class int = 15
 )
 
-func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, int, error) {
-
+func extractDataElement(r io.Reader, order binary.ByteOrder, dataType, numberOfBytes int) (interface{}, int, error) {
 	var element interface{}
 	var elements []interface{}
 	var err error
-	var step int
+	var data []byte
 	var i int
 
+	if dataType == MiMatrix {
+		element, i, err = extractMatrix(r, order)
+		if err != nil {
+			return nil, 0, errors.Wrap(err, "extractMatrix() in extractDataElement() failed")
+		}
+		return element, i, nil
+	}
+
+	data, err = readMatfBytes(r, order, numberOfBytes)
+	if err != nil {
+		return nil, 0, fmt.Errorf("Unable to read %d bytes: %v", numberOfBytes, err)
+	}
 	for i < numberOfBytes {
 		switch dataType {
-		case MiMatrix:
-			tmp := (*data)[i:]
-			element, step, err = extractMatrix(tmp, order)
-			if err != nil {
-				return nil, 0, errors.Wrap(err, "extractMatrix() in extractDataElement() failed")
-			}
-			i += step
-			return element, i, nil
 		case MiInt8:
-			element = int8((*data)[i])
+			element = int8(data[i])
 			i++
 		case MiUint8:
-			element = uint8((*data)[i])
+			element = uint8(data[i])
 			i++
 		case MiInt16:
-			element = int16(order.Uint16((*data)[i : i+2]))
+			element = int16(order.Uint16(data[i : i+2]))
 			i += 2
 		case MiUint16:
-			element = order.Uint16((*data)[i : i+2])
+			element = order.Uint16(data[i : i+2])
 			i += 2
 		case MiInt32:
-			element = int32(order.Uint32((*data)[i : i+4]))
+			element = int32(order.Uint32(data[i : i+4]))
 			i += 4
 		case MiUint32:
-			element = order.Uint32((*data)[i : i+4])
+			element = order.Uint32(data[i : i+4])
 			i += 4
 		case MiSingle:
-			bits := order.Uint32((*data)[i : i+4])
+			bits := order.Uint32(data[i : i+4])
 			element = math.Float32frombits(bits)
 			i += 4
 		case MiInt64:
-			element = int64(order.Uint64((*data)[i : i+8]))
+			element = int64(order.Uint64(data[i : i+8]))
 			i += 8
 		case MiUint64:
-			element = order.Uint64((*data)[i : i+8])
+			element = order.Uint64(data[i : i+8])
 			i += 8
 		case MiDouble:
-			bits := order.Uint64((*data)[i : i+8])
+			bits := order.Uint64(data[i : i+8])
 			element = math.Float64frombits(bits)
 			i += 8
 		default:
@@ -106,92 +108,85 @@ func extractDataElement(data *[]byte, order binary.ByteOrder, dataType, numberOf
 	return elements, i, nil
 }
 
-func extractNumeric(data *[]byte, order binary.ByteOrder) (interface{}, int, error) {
-	dataType, numberOfBytes, offset, err := extractTag(data, order)
+func extractNumeric(r io.Reader, order binary.ByteOrder) (interface{}, int, error) {
+	dataType, numberOfBytes, offset, err := extractTag(r, order)
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "extractTag() in extractNumeric() failed")
 	}
-	tmp := (*data)[offset:]
-	re, _, err := extractDataElement(&tmp, order, int(dataType), int(numberOfBytes))
+
+	re, _, err := extractDataElement(r, order, int(dataType), int(numberOfBytes))
 	if err != nil {
 		return nil, 0, errors.Wrap(err, "extractDataElement() in extractNumeric() failed")
 	}
 	return re, offset + int(numberOfBytes), err
 }
 
-func extractFieldNames(data *[]byte, fieldNameLength, numberOfFields int) ([]string, error) {
+func extractFieldNames(r io.Reader, order binary.ByteOrder, fieldNameLength, numberOfFields int) ([]string, error) {
 	var index int
 	var names []string
+	data, err := readMatfBytes(r, order, fieldNameLength*numberOfFields)
+	if err != nil {
+		return []string{}, fmt.Errorf("Unable to read %d bytes: %v", fieldNameLength*numberOfFields, err)
+	}
 	for ; numberOfFields > 0; numberOfFields-- {
-		str := string((*data)[index : index+fieldNameLength])
+		str := string(data[index : index+fieldNameLength])
 		names = append(names, str)
 		index += fieldNameLength
 	}
 	return names, nil
 }
 
-func extractArrayName(data *[]byte, order binary.ByteOrder) (string, int, error) {
-	_, numberOfBytes, offset, err := extractTag(data, order)
+func extractArrayName(r io.Reader, order binary.ByteOrder) (string, int, error) {
+	_, numberOfBytes, offset, err := extractTag(r, order)
 	if err != nil {
 		return "", 0, errors.Wrap(err, "extractTag() in extractArrayName() failed")
 	}
 	if numberOfBytes == 0 {
 		return "", offset, nil
 	}
-	arrayName := make([]byte, int(numberOfBytes))
-	buf := bytes.NewReader((*data)[offset:])
-	if err := binary.Read(buf, order, &arrayName); err != nil {
-		return "", 0, errors.Wrap(err, "binary.Read() in extractArrayName() failed")
+
+	arrayName, err := readMatfBytes(r, order, int(numberOfBytes))
+	if err != nil {
+		return "", offset, fmt.Errorf("Unable to read %d bytes: %v", numberOfBytes, err)
 	}
+
 	return string(arrayName), offset + int(numberOfBytes), nil
 }
 
-func isSmallDataElementFormat(data *[]byte, order binary.ByteOrder) (bool, error) {
-	var offset int
-
-	if order == binary.LittleEndian {
-		offset = 2
-	}
-
-	small := make([]byte, 2)
-	buf := bytes.NewReader((*data)[offset:])
-	if err := binary.Read(buf, order, &small); err != nil {
-		return false, fmt.Errorf("Could not read bytes: %v", err)
-	}
-	if small[0] != small[1] {
-		// Small Data Element Format
-		return true, nil
-	}
-	return false, nil
-}
-
-func extractTag(data *[]byte, order binary.ByteOrder) (uint32, uint32, int, error) {
+func extractTag(r io.Reader, order binary.ByteOrder) (uint32, uint32, int, error) {
 	var dataType, numberOfBytes uint32
 	var offset int
 
-	small, err := isSmallDataElementFormat(data, order)
+	data, err := readMatfBytes(r, order, 4)
 	if err != nil {
-		return 0, 0, 0, errors.Wrap(err, "isSmallDataElementFormat() in extractTag() failed")
+		return 0, 0, 0, fmt.Errorf("Unable to read %d bytes: %v", 4, err)
 	}
-	if small {
-		dataType = uint32(order.Uint16((*data)[0:2]))
-		numberOfBytes = uint32(order.Uint16((*data)[2:4]))
+	// Small Data Element
+	if (data[2] != data[3]) && order == binary.LittleEndian {
+		dataType = uint32(order.Uint16(data[0:2]))
+		numberOfBytes = uint32(order.Uint16(data[2:4]))
 		offset = 4
 	} else {
-		dataType = order.Uint32((*data)[0:4])
-		numberOfBytes = order.Uint32((*data)[4:8])
+		extend, err := readMatfBytes(r, order, 4)
+		if err != nil {
+			return 0, 0, 0, fmt.Errorf("Unable to read %d bytes: %v", 4, err)
+		}
+		dataType = order.Uint32(data)
+		numberOfBytes = order.Uint32(extend)
 		offset = 8
 	}
 
 	return dataType, numberOfBytes, offset, nil
 }
 
-func readMatfBytes(r io.Reader, order binary.ByteOrder, numberOfBytes int) (*[]byte, error) {
+func readMatfBytes(r io.Reader, order binary.ByteOrder, numberOfBytes int) ([]byte, error) {
+	if numberOfBytes == 0 {
+		return nil, fmt.Errorf("readMatfBytes(): will not read 0 bytes")
+	}
 	data := make([]byte, numberOfBytes)
 	err := binary.Read(r, order, &data)
 	if err != nil {
-		fmt.Println("error", err)
 		return nil, err
 	}
-	return &data, nil
+	return data, nil
 }
