@@ -53,8 +53,7 @@ type CellPrt struct {
 
 // CharPrt represents a matf char array
 type CharPrt struct {
-	CharName   string
-	CharValues []interface{}
+	Chars []string
 }
 
 // MatMatrix represents a matrix
@@ -128,14 +127,15 @@ func alignIndex(r io.Reader, order binary.ByteOrder, index int) int {
 	}
 }
 
-func extractClass(mat *MatMatrix, maxIndex int, r io.Reader, order binary.ByteOrder) (int, error) {
+func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, error) {
 	var index int
-
 	switch int(mat.Class) {
 	case MxCellClass:
 		var content CellPrt
+		var maxElements = mat.Dim.X
+		var noElements int
 		for {
-			if index >= maxIndex {
+			if noElements >= maxElements {
 				break
 			}
 			element, step, err := extractMatrix(r, order)
@@ -144,6 +144,7 @@ func extractClass(mat *MatMatrix, maxIndex int, r io.Reader, order binary.ByteOr
 			}
 			content.Cells = append(content.Cells, element)
 			index = alignIndex(r, order, index+8+step)
+			noElements++
 		}
 		mat.Content = content
 	case MxStructClass:
@@ -182,24 +183,29 @@ func extractClass(mat *MatMatrix, maxIndex int, r io.Reader, order binary.ByteOr
 		mat.Content = content
 	case MxCharClass:
 		var content CharPrt
-		_, numberOfBytes, offset, _ := extractTag(r, order)
-		name, _, err := extractArrayName(r, order)
+		var maxElements = mat.Dim.X
+
+		element, numberOfBytes, err := extractArrayName(r, order)
 		if err != nil {
 			return 0, err
 		}
-		content.CharName = name
-		index = alignIndex(r, order, index+int(offset)+int(numberOfBytes))
-		for {
-			if index >= maxIndex {
-				break
+		index = alignIndex(r, order, index+numberOfBytes)
+		if maxElements > 1 {
+			// Split the elements
+			elements := make(map[int][]byte)
+			var mapIndex int
+			for i, v := range element {
+				if i%2 != 0 {
+					continue
+				}
+				elements[mapIndex%maxElements] = append(elements[mapIndex%maxElements], byte(v))
+				mapIndex++
 			}
-			dataType, numberOfBytes, offset, _ := extractTag(r, order)
-			element, _, err := extractDataElement(r, order, int(dataType), int(numberOfBytes))
-			if err != nil {
-				return 0, err
+			for _, v := range elements {
+				content.Chars = append(content.Chars, string(v))
 			}
-			content.CharValues = append(content.CharValues, element)
-			index = alignIndex(r, order, index+offset+int(numberOfBytes))
+		} else {
+			content.Chars = append(content.Chars, element)
 		}
 		mat.Content = content
 	case MxDoubleClass:
@@ -278,7 +284,7 @@ func extractMatrix(r io.Reader, order binary.ByteOrder) (MatMatrix, int, error) 
 	matrix.Name = arrayName
 	index = alignIndex(r, order, index+step)
 
-	steps, err := extractClass(&matrix, 123, r, order)
+	steps, err := extractClass(&matrix, r, order)
 	if err != nil {
 		return MatMatrix{}, 0, err
 	}
