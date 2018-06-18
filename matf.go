@@ -132,12 +132,14 @@ func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, err
 	switch int(mat.Class) {
 	case MxCellClass:
 		var content CellPrt
-		var maxElements = mat.Dim.X
+		var maxElements = mat.Dim.Y
 		var noElements int
 		for {
 			if noElements >= maxElements {
 				break
 			}
+			// Alignment
+			readMatfBytes(r, order, 8)
 			element, step, err := extractMatrix(r, order)
 			if err != nil {
 				return 0, err
@@ -189,7 +191,7 @@ func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, err
 		if err != nil {
 			return 0, err
 		}
-		index = alignIndex(r, order, index+numberOfBytes)
+		index = alignIndex(r, order, index+numberOfBytes+8)
 		if maxElements > 1 {
 			// Split the elements
 			elements := make(map[int][]byte)
@@ -252,10 +254,11 @@ func extractMatrix(r io.Reader, order binary.ByteOrder) (MatMatrix, int, error) 
 	var err error
 
 	// Array Flags
-	_, numberOfBytes, _, err = extractTag(r, order)
+	_, numberOfBytes, offset, err = extractTag(r, order)
 	if err != nil {
 		return MatMatrix{}, 0, err
 	}
+	index = alignIndex(r, order, index+offset+int(numberOfBytes))
 	arrayFlags, err := readMatfBytes(r, order, int(numberOfBytes))
 	if err != nil {
 		return MatMatrix{}, 0, err
@@ -329,10 +332,8 @@ func decompressData(data []byte) ([]byte, error) {
 
 func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 	var mat MatMatrix
-	var element interface{}
 	var data []byte
 	var dataType, completeBytes uint32
-	var offset, i int
 	tag, err := readBytes(m, 8)
 	if err != nil {
 		return MatMatrix{}, err
@@ -356,7 +357,6 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 			return MatMatrix{}, errors.Wrap(err, "extractTag() in readDataElementField() failed")
 		}
 		data = plain
-		_ = offset
 	}
 
 	tmpfile, err := ioutil.TempFile("", "matf")
@@ -375,7 +375,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 	tmpfile.Seek(0, 0)
 	r := bufio.NewReader(tmpfile)
 
-	element, i, err = extractDataElement(r, order, int(dataType), int(completeBytes))
+	element, i, err := extractDataElement(r, order, int(dataType), int(completeBytes))
 	if err != nil {
 		return MatMatrix{}, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
 	}
@@ -383,7 +383,7 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 		mat = element.(MatMatrix)
 	}
 
-	for uint32(i)+8 != completeBytes {
+	for uint32(i) < completeBytes {
 		return mat, fmt.Errorf("readDataElementField() could not extract all information")
 	}
 
