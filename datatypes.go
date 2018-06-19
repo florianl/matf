@@ -57,14 +57,15 @@ func extractDataElement(r io.Reader, order binary.ByteOrder, dataType, numberOfB
 	if dataType == MiMatrix {
 		element, i, err = extractMatrix(r, order)
 		if err != nil {
-			return nil, 0, errors.Wrap(err, "extractMatrix() in extractDataElement() failed")
+			return nil, 0, errors.Wrap(err, "\nextractMatrix() in extractDataElement() failed")
 		}
 		return element, i, nil
 	}
 
 	data, err = readMatfBytes(r, order, numberOfBytes)
+
 	if err != nil {
-		return nil, 0, fmt.Errorf("Unable to read %d bytes: %v", numberOfBytes, err)
+		return nil, 0, errors.Wrap(err, "\nreadMatfBytes() in extractDataElement() failed")
 	}
 	for i < numberOfBytes {
 		switch dataType {
@@ -111,12 +112,12 @@ func extractDataElement(r io.Reader, order binary.ByteOrder, dataType, numberOfB
 func extractNumeric(r io.Reader, order binary.ByteOrder) (interface{}, int, error) {
 	dataType, numberOfBytes, offset, err := extractTag(r, order)
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "extractTag() in extractNumeric() failed")
+		return nil, 0, errors.Wrap(err, "\nextractTag() in extractNumeric() failed")
 	}
 
 	re, _, err := extractDataElement(r, order, int(dataType), int(numberOfBytes))
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "extractDataElement() in extractNumeric() failed")
+		return nil, 0, errors.Wrap(err, "\nextractDataElement() in extractNumeric() failed")
 	}
 	return re, offset + int(numberOfBytes), err
 }
@@ -124,9 +125,12 @@ func extractNumeric(r io.Reader, order binary.ByteOrder) (interface{}, int, erro
 func extractFieldNames(r io.Reader, order binary.ByteOrder, fieldNameLength, numberOfFields int) ([]string, error) {
 	var index int
 	var names []string
+	if fieldNameLength*numberOfFields == 0 {
+		return names, nil
+	}
 	data, err := readMatfBytes(r, order, fieldNameLength*numberOfFields)
 	if err != nil {
-		return []string{}, fmt.Errorf("Unable to read %d bytes: %v", fieldNameLength*numberOfFields, err)
+		return []string{}, errors.Wrap(err, "\nreadMatfBytes() in extractFieldNames() failed")
 	}
 	for ; numberOfFields > 0; numberOfFields-- {
 		str := string(data[index : index+fieldNameLength])
@@ -139,7 +143,7 @@ func extractFieldNames(r io.Reader, order binary.ByteOrder, fieldNameLength, num
 func extractArrayName(r io.Reader, order binary.ByteOrder) (string, int, error) {
 	_, numberOfBytes, offset, err := extractTag(r, order)
 	if err != nil {
-		return "", 0, errors.Wrap(err, "extractTag() in extractArrayName() failed")
+		return "", 0, errors.Wrap(err, "\nextractTag() in extractArrayName() failed")
 	}
 	if numberOfBytes == 0 {
 		return "", offset, nil

@@ -77,7 +77,7 @@ func readHeader(mat *Matf, file *os.File) error {
 	data := make([]byte, 128)
 	count, err := file.Read(data)
 	if err != nil {
-		return errors.Wrap(err, "file.Read() in readHeader() failed")
+		return errors.Wrap(err, "\nfile.Read() in readHeader() failed")
 	}
 
 	if count != 128 {
@@ -129,6 +129,7 @@ func alignIndex(r io.Reader, order binary.ByteOrder, index int) int {
 
 func extractClass(mat *MatMatrix, r io.Reader, order binary.ByteOrder) (int, error) {
 	var index int
+
 	switch int(mat.Class) {
 	case MxCellClass:
 		var content CellPrt
@@ -256,12 +257,13 @@ func extractMatrix(r io.Reader, order binary.ByteOrder) (MatMatrix, int, error) 
 	// Array Flags
 	_, numberOfBytes, offset, err = extractTag(r, order)
 	if err != nil {
-		return MatMatrix{}, 0, err
+		return MatMatrix{}, 0, errors.Wrap(err, "\nextractTag() in extractMatrix() failed:")
 	}
 	index = alignIndex(r, order, index+offset+int(numberOfBytes))
+
 	arrayFlags, err := readMatfBytes(r, order, int(numberOfBytes))
 	if err != nil {
-		return MatMatrix{}, 0, err
+		return MatMatrix{}, 0, errors.Wrap(err, "\nreadMatfBytes() in extractMatrix() failed:")
 	}
 	matrix.Flags = order.Uint32(arrayFlags)
 	matrix.Class = matrix.Flags & 0x0F
@@ -270,11 +272,11 @@ func extractMatrix(r io.Reader, order binary.ByteOrder) (MatMatrix, int, error) 
 	// Dimensions Array
 	dataType, numberOfBytes, offset, err = extractTag(r, order)
 	if err != nil {
-		return MatMatrix{}, 0, err
+		return MatMatrix{}, 0, errors.Wrap(err, "\nextractTag() in extractMatrix() failed:")
 	}
 	dims, _, err := extractDataElement(r, order, int(dataType), int(numberOfBytes))
 	if err != nil {
-		return MatMatrix{}, 0, err
+		return MatMatrix{}, 0, errors.Wrap(err, "\nextractDataElement() in extractMatrix() failed:")
 	}
 	matrix.Dim, _ = readDimensions(dims)
 	index = alignIndex(r, order, index+offset+int(numberOfBytes))
@@ -282,14 +284,14 @@ func extractMatrix(r io.Reader, order binary.ByteOrder) (MatMatrix, int, error) 
 	// Array Name
 	arrayName, step, err := extractArrayName(r, order)
 	if err != nil {
-		return MatMatrix{}, 0, err
+		return MatMatrix{}, 0, errors.Wrap(err, "\nextractArrayName() in extractMatrix() failed:")
 	}
 	matrix.Name = arrayName
 	index = alignIndex(r, order, index+step)
 
 	steps, err := extractClass(&matrix, r, order)
 	if err != nil {
-		return MatMatrix{}, 0, err
+		return MatMatrix{}, 0, errors.Wrap(err, "\nextractClass() in extractMatrix() failed:")
 	}
 	index = alignIndex(r, order, index+steps)
 
@@ -321,7 +323,7 @@ func decompressData(data []byte) ([]byte, error) {
 	var out bytes.Buffer
 	r, err := zlib.NewReader(tmp)
 	if err != nil {
-		return []byte{}, errors.Wrap(err, "zlib.NewReader() in decompressData() failed")
+		return []byte{}, errors.Wrap(err, "\nzlib.NewReader() in decompressData() failed")
 	}
 	defer r.Close()
 	if r != nil {
@@ -343,25 +345,25 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 	completeBytes = order.Uint32(tag[4:8])
 	data, err = readBytes(m, int(completeBytes))
 	if err != nil {
-		return MatMatrix{}, errors.Wrap(err, "readBytes() in readDataElementField() failed")
+		return MatMatrix{}, errors.Wrap(err, "\nreadBytes() in readDataElementField() failed")
 	}
 
 	if dataType == uint32(MiCompressed) {
 		plain, err := decompressData(data[:completeBytes])
 		if err != nil {
-			return MatMatrix{}, errors.Wrap(err, "decompressData() in readDataElementField() failed")
+			return MatMatrix{}, errors.Wrap(err, "\ndecompressData() in readDataElementField() failed")
 		}
 		dataType = order.Uint32(plain[:4])
 		completeBytes = order.Uint32(plain[4:8])
 		if err != nil {
-			return MatMatrix{}, errors.Wrap(err, "extractTag() in readDataElementField() failed")
+			return MatMatrix{}, errors.Wrap(err, "\nextractTag() in readDataElementField() failed")
 		}
-		data = plain
+		data = plain[8:]
 	}
 
 	tmpfile, err := ioutil.TempFile("", "matf")
 	if err != nil {
-		return MatMatrix{}, errors.Wrap(err, "ioutil.TempFile() in readDataElementField() failed")
+		return MatMatrix{}, errors.Wrap(err, "\nioutil.TempFile() in readDataElementField() failed")
 	}
 
 	defer func() {
@@ -369,15 +371,15 @@ func readDataElementField(m *Matf, order binary.ByteOrder) (MatMatrix, error) {
 		os.Remove(tmpfile.Name())
 	}()
 
-	if _, err := tmpfile.Write(data); err != nil {
-		return MatMatrix{}, errors.Wrap(err, "os.Write() in readDataElementField() failed")
+	if _, err = tmpfile.Write(data); err != nil {
+		return MatMatrix{}, errors.Wrap(err, "\nos.Write() in readDataElementField() failed")
 	}
 	tmpfile.Seek(0, 0)
 	r := bufio.NewReader(tmpfile)
 
 	element, i, err := extractDataElement(r, order, int(dataType), int(completeBytes))
 	if err != nil {
-		return MatMatrix{}, errors.Wrap(err, "extractDataElement() in readDataElementField() failed")
+		return MatMatrix{}, errors.Wrap(err, "\nextractDataElement() in readDataElementField() failed")
 	}
 	if int(dataType) == MiMatrix {
 		mat = element.(MatMatrix)
@@ -411,7 +413,7 @@ func Open(file string) (*Matf, error) {
 
 	err = readHeader(mat, f)
 	if err != nil {
-		return nil, errors.Wrap(err, "readHeader() in Open() failed")
+		return nil, errors.Wrap(err, "\nreadHeader() in Open() failed")
 	}
 
 	return mat, nil
