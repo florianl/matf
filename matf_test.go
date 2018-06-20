@@ -1,6 +1,7 @@
 package matf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -56,8 +57,7 @@ var (
 		0x0f}
 )
 
-func TestCheckIndex(t *testing.T) {
-	t.Parallel()
+func TestAlignIndex(t *testing.T) {
 
 	tests := []struct {
 		name string
@@ -70,9 +70,11 @@ func TestCheckIndex(t *testing.T) {
 		{name: "9", in: 9, out: 16},
 	}
 
+	fakeReader := bytes.NewReader([]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07})
+
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ret := checkIndex(tc.in)
+			ret := alignIndex(fakeReader, binary.LittleEndian, tc.in)
 			if ret != tc.out {
 				t.Fatalf("Expected: %v \t Got: %v", tc.out, ret)
 			}
@@ -236,13 +238,14 @@ func TestExtractMatrix(t *testing.T) {
 		data []byte
 		err  string
 	}{
-		{name: "notExpectedArrayFlagSize", data: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, err: "Expected Array Flags field lengt of 8 got"},
-		{name: "invalidSmallTag", data: []byte{0x00, 0x01, 0x02, 0x03}, err: "Expected Array Flags field lengt of 8 got"},
+		{name: "notExpectedArrayFlagSize", data: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, err: "will not read 0 bytes"},
+		{name: "invalidSmallTag", data: []byte{0x00, 0x01, 0x02, 0x03}, err: "EOF"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			mat, index, err := extractMatrix(tc.data, binary.LittleEndian)
+			r := bytes.NewReader(tc.data)
+			mat, index, err := extractMatrix(r, binary.LittleEndian)
 			fmt.Println(err)
 			if err != nil {
 				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
