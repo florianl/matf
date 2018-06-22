@@ -240,6 +240,7 @@ func TestExtractMatrix(t *testing.T) {
 	}{
 		{name: "notExpectedArrayFlagSize", data: []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, err: "will not read 0 bytes"},
 		{name: "invalidSmallTag", data: []byte{0x00, 0x01, 0x02, 0x03}, err: "EOF"},
+		{name: "tooFewBytes", data: []byte{0x00, 0x01}, err: "EOF"},
 	}
 
 	for _, tc := range tests {

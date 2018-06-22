@@ -197,7 +197,8 @@ func TestExtractDataElement(t *testing.T) {
 		ele           interface{}
 		err           string
 	}{
-		{name: "Unknown", data: []byte{0x11, 0x22, 0x33, 0x44}, order: binary.LittleEndian, dataType: 42, numberOfBytes: 42, step: 0, err: "unexpected EOF"},
+		{name: "TooLessData", data: []byte{0x11, 0x22, 0x33, 0x44}, order: binary.LittleEndian, dataType: 42, numberOfBytes: 42, step: 0, err: "unexpected EOF"},
+		{name: "Unknown", data: []byte{0x11, 0x22, 0x33, 0x44}, order: binary.LittleEndian, dataType: 42, numberOfBytes: 4, step: 0, err: "is not supported"},
 		{name: "MiInt8", data: []byte{0x11, 0x22, 0x33, 0x44}, order: binary.LittleEndian, dataType: MiInt8, numberOfBytes: 1, step: 1, ele: []interface{}{17}},
 		{name: "MiUint8", data: []byte{0x11, 0x22, 0x33, 0x44}, order: binary.LittleEndian, dataType: MiUint8, numberOfBytes: 1, step: 1, ele: 17},
 		{name: "MiInt16", data: []byte{0x11, 0x22, 0x33, 0x44}, order: binary.LittleEndian, dataType: MiInt16, numberOfBytes: 2, step: 2, ele: 8721},
@@ -290,6 +291,8 @@ func TestExtractFieldNames(t *testing.T) {
 		err             string
 	}{
 		{name: "['abc']", data: []byte{0x61, 0x62, 0x63}, fieldNameLength: 3, numberOfFields: 1, fields: []string{"abc"}},
+		{name: "0", data: []byte{0x00}, fieldNameLength: 0, numberOfFields: 0},
+		{name: "UnableToRead", data: []byte{0x61, 0x62, 0x63}, fieldNameLength: 9, numberOfFields: 1, err: "unexpected EOF"},
 	}
 
 	for _, tc := range tests {
@@ -327,6 +330,7 @@ func TestExtractArrayName(t *testing.T) {
 		{name: "ThisIsALongerName", data: []byte{0x01, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x54, 0x68, 0x69, 0x73, 0x49, 0x73, 0x41, 0x4c, 0x6f, 0x6e, 0x67, 0x65, 0x72, 0x4e, 0x61, 0x6d, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, order: binary.LittleEndian, step: 25, arrayName: "ThisIsALongerName"},
 		{name: "TooFewBytes", data: []byte{0x01, 0x10}, order: binary.LittleEndian, step: 1, err: "Unable to read"},
 		{name: "ZeroLength", data: []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, order: binary.LittleEndian, step: 8, arrayName: ""},
+		{name: "UnableToRead", data: []byte{0x01, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00}, order: binary.LittleEndian, err: "Unable to read"},
 	}
 
 	for _, tc := range tests {
