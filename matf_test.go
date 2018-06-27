@@ -312,19 +312,51 @@ func TestMatf(t *testing.T) {
 	}
 	defer simple.Close()
 
-	x, err := Open(simple.Name())
-	if err != nil {
-		t.Fatalf("Could not open test file: %v", err)
+	corrupt, ferr := ioutil.TempFile(tdir, "corrupt.mat")
+	if ferr != nil {
+		t.Fatal(ferr)
 	}
-	defer Close(x)
+	defer os.Remove(corrupt.Name())
 
-	for {
-		mat, err := ReadDataElement(x)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			t.Fatalf("Could not open test file: %v", err)
-		}
-		_ = mat
+	ferr = ioutil.WriteFile(corrupt.Name(), noMatf, 0644)
+	if ferr != nil {
+		t.Fatal(ferr)
+	}
+	defer simple.Close()
+
+	tests := []struct {
+		name string
+		file string
+		err  string
+	}{
+		{name: "simple", file: simple.Name()},
+		{name: "corrupt", file: corrupt.Name(), err: "Could not read enough bytes"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			x, err := Open(tc.file)
+			if err != nil {
+				if matched, _ := regexp.MatchString(tc.err, err.Error()); !matched {
+					t.Fatalf("Error matching regex: %v \t Got: %v", tc.err, err)
+				} else {
+					return
+				}
+				t.Fatalf("Expected no error, got: %v", err)
+			} else if len(tc.err) != 0 {
+				t.Fatalf("Expected error, got none")
+			}
+			defer Close(x)
+
+			for {
+				mat, err := ReadDataElement(x)
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					t.Fatalf("Could not open test file: %v", err)
+				}
+				_ = mat
+			}
+		})
 	}
 }
